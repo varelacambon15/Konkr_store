@@ -39,6 +39,8 @@ scripts que imitan lo justo y registran con qué se les llama.
   cambios locales → no hace pull; con un archivo que se pisaría → git se niega y el script sigue.
 
 ### Recomps a Steam automáticamente y Linux/Windows
+- Apps: tras «Instalar» (flatpak simulado), se añaden a Steam sin diálogo (copia de seguridad y petición a Steam), con
+  «A Steam: automático» activado; desactivado, pregunta como antes.
 - `jugar_recomp.py` con un `library.json` simulado de 4 recomps (aarch64 real, x86_64 real con `recomplauncher.json`,
   Windows con `proton: true`, sin ejecutable): las clasifica bien; vía RecompLauncher por defecto (`--play id`);
   directo x86_64 → FEX con la carpeta del ejecutable (la misma que usa RecompLauncher), argumentos del manifiesto,

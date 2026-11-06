@@ -44,7 +44,8 @@ el teclado en pantalla. Los avisos y confirmaciones salen dentro de la propia ve
 **Se añaden solas.** Al cerrar RecompLauncher (y al entrar en Recompilaciones), las recomps instaladas que aún no
 tienen acceso en Steam se añaden automáticamente: primero tu copia de seguridad de Steam (una por tanda; si falla,
 no se añade nada) y luego se le pide a Steam por la vía segura (`steam://addnonsteamgame`). Steam cerrado: quedan
-pendientes para la próxima vez. Se desactiva en Herramientas → «Recomps a Steam: auto sí/no». Registro:
+pendientes para la próxima vez. Las **aplicaciones** se instalan cuando tú eliges una («Instalar») y, al terminar, también se añaden a Steam solas.
+Las dos cosas se desactivan en Herramientas → «A Steam: automático sí/no» (entonces pregunta cada vez). Registro:
 `~/recomp/logs/auto_steam.log`.
 
 **Linux o Windows.** Cada recomp muestra qué build tiene instalada:

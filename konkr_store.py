@@ -730,11 +730,19 @@ def interfaz():
                     if si_no("Instalar", f"¿Instalar {a['nombre']} ({a['id']}) en tu usuario?"):
                         tarea(sal_apps, f"Instalar {a['nombre']}",
                               ["flatpak", "install", "--user", "-y", "--noninteractive", "flathub", a["id"]],
-                              lambda cod: cod == 0 and (ver_detalle(), refrescar_marcas(),
-                                                         pedir_steam(sal_apps, acceso_app(a["id"], a["nombre"]), a["nombre"])))
+                              lambda cod: cod == 0 and (ver_detalle(), refrescar_marcas(), app_a_steam(a)))
                 en_ventana(seguir)
             threading.Thread(target=comprobar, daemon=True).start()
         asegurar_flathub(paso2)
+
+    def app_a_steam(a):
+        """Tras instalar: a Steam sin preguntar si «A Steam: automático» está activado (la copia de seguridad la hace
+        anadir_a_steam.sh y, si falta o falla, no añade nada); si no, con la confirmación de siempre."""
+        acc = acceso_app(a["id"], a["nombre"])
+        if auto_activo():
+            tarea(sal_apps, f"Añadir {a['nombre']} a Steam (automático)", ["bash", str(ANADIR), str(acc)])
+        else:
+            pedir_steam(sal_apps, acc, a["nombre"])
 
     def refrescar_marcas():
         inst = apps_instaladas()
@@ -1010,8 +1018,9 @@ def interfaz():
 
     def cambiar_auto():
         poner_auto(not auto_activo())
-        escribir(sal_h, f"\nAñadir recomps a Steam automáticamente: {'sí' if auto_activo() else 'no'}\n"
-                        "(al cerrar RecompLauncher y al entrar en Recompilaciones; siempre con copia de seguridad antes)\n")
+        escribir(sal_h, f"\nAñadir a Steam automáticamente: {'sí' if auto_activo() else 'no'}\n"
+                        "(las apps al instalarlas; las recomps al cerrar RecompLauncher y al entrar en Recompilaciones;\n"
+                        " siempre con copia de seguridad antes)\n")
 
     def launcher_a_steam():
         if hay_launcher():
@@ -1019,7 +1028,7 @@ def interfaz():
 
     botones_h = [("Buscar actualizaciones", buscar_actualizaciones), ("Actualizar todo", actualizar_todo),
                  ("Cambiar de versión", cambiar_version), ("Modo gráfico: cambiar", cambiar_graficos),
-                 ("Recomps a Steam: auto sí/no", cambiar_auto),
+                 ("A Steam: automático sí/no", cambiar_auto),
                  ("Añadir RecompLauncher a Steam", launcher_a_steam), ("Copia de seguridad de Steam", respaldo),
                  ("Diagnóstico", diagnostico), ("Ver registro", ver_registro),
                  ("Guardar esta salida", guardar_salida), ("← Volver", lambda: mostrar("inicio"))]
@@ -1032,7 +1041,7 @@ def interfaz():
                          "al_entrar": lambda: escribir(sal_h, f"RecompLauncher: {version_actual() or 'no instalado'}"
                                                               f"\nVersiones guardadas: {len(versiones())}"
                                                               f"\nModo gráfico: {modo_grafico()}"
-                                                              f"\nRecomps a Steam automáticamente: {'sí' if auto_activo() else 'no'}\n", limpiar=True)}
+                                                              f"\nA Steam automáticamente (apps y recomps): {'sí' if auto_activo() else 'no'}\n", limpiar=True)}
 
     mostrar("inicio")
     raiz.mainloop()
