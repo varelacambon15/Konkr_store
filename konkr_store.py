@@ -381,7 +381,9 @@ def interfaz():
 
     juego = os.environ.get("XDG_CURRENT_DESKTOP", "").lower() == "gamescope" or bool(os.environ.get("SteamGameId"))
     F_TIT, F_BOT, F_TXT, F_LIS = ("sans", 28, "bold"), ("sans", 18), ("monospace", 12), ("sans", 18)
-    FONDO, PANEL, TEXTO, ACENTO, FOCO = "#0e141b", "#1b2838", "#e8eef4", "#66c0f4", "#2a475e"
+    # La paleta de RecompLauncher (ui/app.css): fondo, tarjetas, texto, acento cian
+    FONDO, PANEL, TEXTO, ACENTO, FOCO = "#0B1220", "#0f1829", "#F4F8FC", "#34F2E8", "#1b2842"
+    TARJETA2, TENUE = "#141f33", "#A9B4C4"
 
     raiz = tk.Tk()
     raiz.title("Konkr Store")
@@ -930,32 +932,138 @@ def interfaz():
     pantallas["apps"] = {"marco": m, "foco": lambda: lb_apps,
                          "al_entrar": lambda: (not apps_vista) and ver_destacadas()}
 
-    # ================= RECOMPILACIONES
+    # ================= RECOMPILACIONES (al estilo de RecompLauncher: cuadrícula de portadas y panel de detalle)
+    sys.path.insert(0, str(DIR / "herramientas"))
+    import portadas
     m = tk.Frame(raiz, bg=FONDO)
     cabecera(m, "Recompilaciones")
     barra = tk.Frame(m, bg=FONDO)
     barra.pack(fill="x", padx=24)
-    lb_rec = lista(m)
-    lb_rec.pack(fill="both", expand=True, padx=24, pady=6)
+    cuerpo_r = tk.Frame(m, bg=FONDO)
+    cuerpo_r.pack(fill="both", expand=True, padx=24, pady=6)
+    rej = tk.Canvas(cuerpo_r, bg=FONDO, highlightthickness=0, takefocus=1)
+    rej.pack(side="left", fill="both", expand=True)
+    det = tk.Frame(cuerpo_r, bg=PANEL, width=560)
+    det.pack(side="left", fill="y", padx=(14, 0)); det.pack_propagate(False)
+    det_hero = tk.Label(det, bg=TARJETA2, bd=0); det_hero.pack(fill="x")
+    det_logo = tk.Label(det, bg=PANEL, fg=TEXTO, font=("sans", 24, "bold"), wraplength=520, justify="left", anchor="w")
+    det_logo.pack(fill="x", padx=18, pady=(14, 4))
+    det_meta = tk.Label(det, bg=PANEL, fg=ACENTO, font=("sans", 14, "bold"), wraplength=520, justify="left", anchor="w")
+    det_meta.pack(fill="x", padx=18)
+    det_txt = tk.Label(det, bg=PANEL, fg=TENUE, font=("sans", 14), wraplength=520, justify="left", anchor="nw")
+    det_txt.pack(fill="both", expand=True, padx=18, pady=(10, 14))
     acciones = tk.Frame(m, bg=FONDO)
     acciones.pack(fill="x", padx=24)
-    sal_rec = caja_texto(m, 8)
+    sal_rec = caja_texto(m, 4)
     sal_rec.pack(fill="x", padx=24, pady=(6, 16))
     rec_vista = []
     ya_avisadas = set()
+    R = {"sel": 0, "fotos": {}, "en_steam": set(), "datos": {}}
+    CW, CH, TXT, GAP = 176, 264, 54, 18          # portada 2:3, como las de RecompLauncher
+
+    def r_cols():
+        return max(1, (rej.winfo_width() - GAP) // (CW + GAP))
+
+    def r_pintar(_e=None):
+        rej.delete("all")
+        cols = r_cols(); foco = raiz.focus_get() is rej
+        for i, g in enumerate(rec_vista):
+            x = GAP // 2 + (i % cols) * (CW + GAP); y = GAP // 2 + (i // cols) * (CH + TXT + GAP)
+            sel = i == R["sel"]
+            if sel:
+                rej.create_rectangle(x - 5, y - 5, x + CW + 5, y + CH + TXT + 3, outline=ACENTO if foco else FOCO, width=4)
+            rej.create_rectangle(x, y, x + CW, y + CH + TXT - 2, fill=PANEL, outline="")
+            f = R["fotos"].get(g["id"])
+            if f:
+                rej.create_image(x, y, image=f, anchor="nw")
+            else:                                  # sin imagen: tarjeta con las iniciales
+                rej.create_rectangle(x, y, x + CW, y + CH, fill=TARJETA2, outline="")
+                ini = "".join(w if w.isdigit() else w[0] for w in re.findall(r"[A-Za-z0-9]+", g["nombre"])[:3]).upper()[:4]
+                rej.create_text(x + CW / 2, y + CH / 2, text=ini, fill=TENUE, font=("sans", 34, "bold"))
+            nombre = g["nombre"] if len(g["nombre"]) <= 17 else g["nombre"][:16].rstrip() + "…"
+            rej.create_text(x + 8, y + CH + 8, text=("★ " if g["id"] in R["en_steam"] else "") + nombre, fill=TEXTO,
+                            font=("sans", 13, "bold"), anchor="nw")
+            rej.create_text(x + 8, y + CH + 30, text=tipo_recomp(g["id"])[1], fill=ACENTO if "ARM64" in tipo_recomp(g["id"])[1] else TENUE,
+                            font=("sans", 11), anchor="nw")
+        filas = (len(rec_vista) + cols - 1) // cols
+        rej.configure(scrollregion=(0, 0, rej.winfo_width(), filas * (CH + TXT + GAP) + GAP))
+
+    def r_ver_sel():
+        if not rec_vista:
+            return
+        cols = r_cols(); y = (R["sel"] // cols) * (CH + TXT + GAP)
+        alto = max(1, (len(rec_vista) + cols - 1) // cols * (CH + TXT + GAP) + GAP)
+        top, bot = rej.yview()
+        if y / alto < top or (y + CH + TXT + GAP) / alto > bot:
+            rej.yview_moveto(max(0, y / alto - 0.02))
+        r_detalle()
+
+    def r_mover(dx, dy):
+        n = len(rec_vista)
+        if not n:
+            return "break"
+        cols = r_cols(); i = R["sel"]
+        if dy < 0 and i < cols:                   # arriba del todo: a la barra de botones
+            rej.tk_focusPrev().focus_set(); return "break"
+        if dy > 0 and i + cols >= n and (i // cols) == (n - 1) // cols:   # última fila: a los botones de abajo
+            acciones.winfo_children()[0].focus_set(); return "break"
+        R["sel"] = max(0, min(n - 1, i + dx + dy * cols))
+        r_pintar(); r_ver_sel(); return "break"
+    rej.bind("<Left>", lambda e: r_mover(-1, 0)); rej.bind("<Right>", lambda e: r_mover(1, 0))
+    rej.bind("<Up>", lambda e: r_mover(0, -1)); rej.bind("<Down>", lambda e: r_mover(0, 1))
+    rej.bind("<Return>", lambda e: (jugar(), "break")[1]); rej.bind("<KP_Enter>", lambda e: (jugar(), "break")[1])
+    rej.bind("<FocusIn>", r_pintar); rej.bind("<FocusOut>", r_pintar); rej.bind("<Configure>", r_pintar)
+    rej.bind("<Button-4>", lambda e: rej.yview_scroll(-2, "units")); rej.bind("<Button-5>", lambda e: rej.yview_scroll(2, "units"))
+
+    def r_click(e):
+        cols = r_cols(); x, y = rej.canvasx(e.x), rej.canvasy(e.y)
+        i = int(y // (CH + TXT + GAP)) * cols + int(x // (CW + GAP))
+        if 0 <= i < len(rec_vista) and x % (CW + GAP) < CW + GAP // 2:
+            R["sel"] = i; rej.focus_set(); r_pintar(); r_detalle()
+    rej.bind("<Button-1>", r_click)
+
+    def r_detalle():
+        g = rec_sel()
+        if not g:
+            det_hero.configure(image="", height=1); det_logo.configure(image="", text=""); det_meta.configure(text=""); det_txt.configure(text=""); return
+        d = R["datos"].get(g["id"]) or portadas.datos(g["id"])
+        h = R["fotos"].get(g["id"] + ":hero"); lg = R["fotos"].get(g["id"] + ":logo")
+        det_hero.configure(image=h or "", height=175 if h else 1)
+        det_logo.configure(image=lg or "", text="" if lg else g["nombre"])
+        modo, etq, expl = tipo_recomp(g["id"])
+        meta = " · ".join(x for x in (d["juego"], d["genero"], g["version"], etq) if x)
+        det_meta.configure(text=meta)
+        t = d["texto"].strip()
+        det_txt.configure(text=(t[:300].rstrip() + "…" if len(t) > 300 else t) + ("\n\n" if t else "") + expl
+                               + (f"\n\nPor {d['autor']}" if d["autor"] else "") + ("\n\n★ Ya en Steam" if g["id"] in R["en_steam"] else ""))
+
+    def r_cargar_arte():
+        """En segundo plano: busca/descarga portada, banner y logo de cada recomp; las fotos se crean en el hilo de la ventana."""
+        lista_ids = [g["id"] for g in rec_vista]
+        def trabajo():
+            for gid in lista_ids:
+                d = portadas.datos(gid); R["datos"][gid] = d
+                for clave, fuente, w, hh, modo in ((gid, d["cover"], CW, CH, "cubrir"), (gid + ":hero", d["hero"], 560, 175, "cubrir"),
+                                                   (gid + ":logo", d["logo"], 400, 110, "caber")):
+                    if clave in R["fotos"] or not fuente:
+                        continue
+                    ruta = portadas.local(fuente) or portadas.descargar(fuente)
+                    if ruta:
+                        def poner(c=clave, r=ruta, w=w, hh=hh, modo=modo):
+                            f = portadas.foto(tk, r, w, hh, modo)
+                            if f:
+                                R["fotos"][c] = f; r_pintar(); r_detalle()
+                        en_ventana(poner)
+        threading.Thread(target=trabajo, daemon=True).start()
 
     def pintar_recomps(avisar=False, limpiar=True):
         rec_vista.clear()
         rec_vista.extend(recomps())
         ya = anadidos()
-        lb_rec.delete(0, "end")
-        for g in rec_vista:
-            en_steam = str(ACCESOS / f"{nombre_archivo('recomp-' + g['id'])}.desktop") in ya
-            etq = tipo_recomp(g["id"])[1]
-            lb_rec.insert("end", f"{'★ ' if en_steam else '   '}{g['nombre']}   {g['version']}   [{etq}]")
+        R["en_steam"] = {g["id"] for g in rec_vista if str(ACCESOS / f"{nombre_archivo('recomp-' + g['id'])}.desktop") in ya}
+        R["sel"] = min(R["sel"], max(0, len(rec_vista) - 1))
+        r_pintar(); r_detalle(); r_cargar_arte()
         if rec_vista:
-            lb_rec.selection_set(0)
-            lb_rec.activate(0)
             escribir(sal_rec, f"{len(rec_vista)} recomps instaladas (★ = ya pedida a Steam). Las de Linux se abren sin Proton; "
                               "las [Windows·Proton] usan el Proton de RecompLauncher. En Steam ninguna necesita Proton.\n", limpiar=limpiar)
         else:
@@ -979,8 +1087,7 @@ def interfaz():
                 pedir_steam(sal_rec, acceso_recomp(g["id"]), g["nombre"], lambda c: pintar_recomps(limpiar=False))
 
     def rec_sel():
-        s = lb_rec.curselection()
-        return rec_vista[s[0]] if s and s[0] < len(rec_vista) else None
+        return rec_vista[R["sel"]] if 0 <= R["sel"] < len(rec_vista) else None
 
     def hay_launcher():
         if LANZADOR.exists() and version_actual():
@@ -1084,7 +1191,7 @@ def interfaz():
     for texto, cmd in (("Jugar", jugar), ("Añadir a Steam", steam_rec), ("Directo / Launcher", modo_recomp), ("Revisar binarios", revisar),
                        ("← Volver", lambda: mostrar("inicio"))):
         boton(acciones, texto, cmd).pack(side="left", padx=(0, 10), pady=6)
-    pantallas["recomps"] = {"marco": m, "foco": lambda: lb_rec,
+    pantallas["recomps"] = {"marco": m, "foco": lambda: rej,
                             "al_entrar": lambda: pintar_recomps(avisar=True)}
 
     # ================= JUEGOS DE SWITCH (nx2konkr)

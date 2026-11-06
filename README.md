@@ -9,7 +9,8 @@ Al abrirla aparecen tres secciones:
 | Sección | Qué hace |
 |---|---|
 | **Aplicaciones** | Tipo Discover: aplicaciones **Flatpak de Flathub** (destacadas, búsqueda, instaladas, actualizar todas). Instala siempre **en tu usuario** (`flatpak --user`), sin sudo. Antes de instalar comprueba que la app exista para ARM64. |
-| **Recompilaciones** | Las recomps instaladas con [RecompLauncher](https://github.com/elripalda/RecompLauncher): **Jugar**, **Añadir a Steam**, **Revisar binarios** (aarch64 o x86_64, qué librerías faltan) y **Descargar recomps** (abre RecompLauncher). Avisa de las recomps nuevas que aún no tengan acceso en Steam. |
+| **Recompilaciones** | Al estilo de [RecompLauncher](https://github.com/elripalda/RecompLauncher): **cuadrícula de portadas** (las de su catálogo, o las que elegiste en él) y un **panel de detalle** con su banner, logo, juego, género y descripción. **Jugar**, **Añadir a Steam**, **Revisar binarios** y **Descargar recomps** (abre RecompLauncher). Las nuevas van a Steam solas. |
+| **Juegos de Switch** | Los juegos portados con nx2konkr que copias a `~/juegos-switch`: se añaden a Steam solos. |
 | **Herramientas** | Buscar actualizaciones, actualizar todo, cambiar de versión de RecompLauncher, modo gráfico, añadir RecompLauncher a Steam, copia de seguridad de Steam, diagnóstico, ver registro, guardar la salida. |
 
 > RecompLauncher no incluye juegos ni los descarga: cada recomp necesita **tu propia copia** del juego.
@@ -38,6 +39,13 @@ También aparece en el menú del escritorio como **Konkr Store**, si aceptaste c
 
 **Controles:** flechas o cruceta para moverse · Intro / A para elegir · Esc / B para volver · Steam + X para
 el teclado en pantalla. Los avisos y confirmaciones salen dentro de la propia ventana, con botones grandes.
+
+## Portadas de las recomps
+
+La tienda usa el arte de RecompLauncher: primero el que elegiste en él, si no el de su catálogo. Busca la imagen en su caché y, si
+no está, la descarga una vez a `~/recomp/cache/arte/`. Para ver portadas JPEG/WebP hace falta **Pillow**: el instalador (paso 9) la
+pone en un entorno propio, `~/Konkr_store/.venv`, sin tocar el sistema. Sin ella, se ven las PNG (y las demás si hay `ffmpeg`), y
+si no, tarjetas con iniciales.
 
 ## Instalar programas desde un archivo (AppImage, .tar.gz, .deb…)
 

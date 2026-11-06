@@ -38,6 +38,15 @@ scripts que imitan lo justo y registran con qué se les llama.
 - `actualizar.sh` contra un repo git local: sin cambios → `git pull` y se relanza con la versión nueva; con
   cambios locales → no hace pull; con un archivo que se pisaría → git se niega y el script sigue.
 
+### Recompilaciones con portadas
+- Con un `library.json` y un `pc-catalog.json` simulados (4 recomps; portada, banner y logo PNG/JPEG para unas, una dirección
+  inaccesible y una sin arte): cuadrícula con portadas, tarjetas con iniciales («MK64») cuando no hay imagen, navegación con flechas
+  (y bajando desde la última fila, a los botones), desplazamiento, panel con banner, logo, metadatos y descripción. Sin Pillow:
+  PNG con Tk y JPEG a través de `ffmpeg` (este contenedor lo tiene).
+- Paleta de RecompLauncher en toda la tienda.
+- No probado: el catálogo y la caché reales de RecompLauncher (las direcciones salen de su código: `cache/pc-catalog.json`, campos
+  `cover`, `hero`, `logo`, relativos a recomplauncher.com), ni la red de la Konkr.
+
 ### Instalar desde archivo local
 - `instalar_local.py` con archivos de prueba hechos aquí: `.tar.gz` (binario aarch64 + `start.sh` + `lib/`: elige el binario por su nombre,
   ARM64, icono); `.zip` x86_64 (lanzador con FEX y sin `LD_PRELOAD`, ejecutado con un FEX simulado); `.deb` con xz y con zstd (construidos
