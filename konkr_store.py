@@ -712,8 +712,8 @@ def interfaz():
         apps_vista.extend(items)
         lb_apps.delete(0, "end")
         for a in items:
-            marca = "✔ " if a["id"] in inst else "   "
-            lb_apps.insert("end", f"{marca}{a['nombre']}")
+            marca = "✔ " if a.get("local") or a["id"] in inst else "   "
+            lb_apps.insert("end", f"{marca}{a['nombre']}" + (f"   [{a['desc']}]" if a.get("local") else ""))
         escribir(sal_apps, f"{titulo}: {len(items)} aplicaciones\n")
         if items:
             lb_apps.selection_set(0)
@@ -728,6 +728,12 @@ def interfaz():
         a = app_sel()
         if not a:
             detalle.configure(text="")
+            return
+        if a.get("local"):
+            i = a["local"]
+            detalle.configure(text=f"{a['nombre']}\n\nInstalado desde archivo\n({i.get('tipo')}, "
+                                   f"{'ARM64 nativo' if i.get('arch') == 'aarch64' else 'x86_64 con FEX'})\n\n{Path(i.get('origen', '')).name}\n\n"
+                                   f"{i.get('instalado', '')}\n\n{i['carpeta']}")
             return
         inst = apps_instaladas().get(a["id"])
         estado = f"Instalada ({inst[2]}) {inst[1]}" if inst else "No instalada"
@@ -754,12 +760,58 @@ def interfaz():
     def ver_destacadas():
         pintar_apps(destacadas(), "Destacadas")
 
+    def locales():
+        sys.path.insert(0, str(DIR / "herramientas"))
+        import instalar_local
+        return instalar_local
+
     def ver_instaladas():
-        if sin_flatpak():
+        loc = [{"id": "local:" + Path(i["carpeta"]).name, "nombre": i["nombre"], "categoria": "Local",
+                "desc": f"{i['tipo']} · {'ARM64' if i['arch'] == 'aarch64' else 'x86_64·FEX'}", "local": i} for i in locales().lista()]
+        inst = apps_instaladas() if flatpak() else {}
+        pintar_apps(loc + [{"id": i, "nombre": v[0], "desc": f"Versión {v[1]}", "categoria": f"Instalación: {v[2]}"}
+                           for i, v in sorted(inst.items(), key=lambda x: x[1][0].lower())], "Instaladas")
+
+    def instalar_archivo():
+        L = locales()
+        cands = L.candidatos()
+        opciones = [f"{p.name}   ({p.parent})" for p in cands[:40]] + ["Escribir otra ruta…"]
+        i = elegir_de("Instalar archivo", "Instalables encontrados en Descargas, Escritorio y memorias USB (recientes primero). "
+                      "AppImage, .tar.gz, .zip, .deb, paquetes de Arch, Flatpak o instaladores .sh.", opciones)
+        if i is None:
             return
-        inst = apps_instaladas()
-        pintar_apps([{"id": i, "nombre": v[0], "desc": f"Versión {v[1]}", "categoria": f"Instalación: {v[2]}"}
-                     for i, v in sorted(inst.items(), key=lambda x: x[1][0].lower())], "Instaladas")
+        if i == len(opciones) - 1:
+            r = pedir_texto("Instalar archivo", "Ruta completa del archivo (teclado en pantalla: Steam + X):")
+            if not r:
+                return
+            ruta = Path(r).expanduser()
+        else:
+            ruta = cands[i]
+        try:
+            t = L.tipo(ruta)
+        except L.NoSePuede as e:
+            error("Instalar archivo", str(e)); return
+        if t in ("windows", "rpm", "?"):
+            info("Instalar archivo", L.EXPLICA[t]); return
+        if t == "instalador":
+            if si_no("Instalador", f"{ruta.name}: {L.EXPLICA[t]}\n\n¿Abrirlo en Konsole?"):
+                lanzar(["konsole", "--workdir", str(HOME / "Applications"), "-e", "bash", str(ruta)], sal_apps, ruta.name)
+            return
+        nombre = L.nombre_limpio(ruta)
+        if not si_no("Instalar archivo", f"{ruta.name}\n\n{L.EXPLICA[t]}.\n\nSe instalará como «{nombre}» en ~/Applications/Locales/{nombre}"
+                     "\n(nada fuera de tu carpeta de usuario). ¿Instalar?"):
+            return
+
+        def fin(codigo):
+            hecho = next((x for x in L.lista() if x.get("origen") == str(ruta.resolve())), None)
+            ver_instaladas()
+            if codigo == 0 and hecho:
+                acc = Path(hecho["acceso"])
+                if auto_activo():
+                    tarea(sal_apps, f"Añadir {hecho['nombre']} a Steam (automático)", ["bash", str(ANADIR), str(acc)])
+                else:
+                    pedir_steam(sal_apps, acc, hecho["nombre"])
+        tarea(sal_apps, f"Instalar {ruta.name}", [sys.executable, str(DIR / "herramientas/instalar_local.py"), "instalar", str(ruta)], fin)
 
     def buscar():
         if sin_flatpak():
@@ -822,20 +874,33 @@ def interfaz():
 
     def abrir_app():
         a = app_sel()
-        if a and a["id"] in apps_instaladas():
+        if a and a.get("local"):
+            lanzar([str(Path(a["local"]["carpeta"]) / "jugar.sh")], sal_apps, a["nombre"])
+        elif a and a["id"] in apps_instaladas():
             lanzar(["flatpak", "run", a["id"]], sal_apps, a["nombre"])
         elif a:
             info("Abrir", "Primero instálala.")
 
     def steam_app():
         a = app_sel()
-        if a and a["id"] in apps_instaladas():
+        if a and a.get("local"):
+            pedir_steam(sal_apps, Path(a["local"]["acceso"]), a["nombre"])
+        elif a and a["id"] in apps_instaladas():
             pedir_steam(sal_apps, acceso_app(a["id"], a["nombre"]), a["nombre"])
         elif a:
             info("Añadir a Steam", "Primero instálala.")
 
     def desinstalar():
         a = app_sel()
+        if a and a.get("local"):
+            c = Path(a["local"]["carpeta"])
+            if si_no("Desinstalar", f"¿Mover a la papelera {a['nombre']}?\n({c})\n\nSi lo añadiste a Steam, quita el acceso desde Steam."):
+                for p in (c, Path(a["local"]["acceso"])):
+                    if p.exists() and sh(["gio", "trash", str(p)])[0] != 0:
+                        dest = HOME / "Papelera_konkr_store" / time.strftime("%Y%m%d_%H%M%S"); dest.mkdir(parents=True, exist_ok=True)
+                        shutil.move(str(p), str(dest / p.name))
+                escribir(sal_apps, f"\n{a['nombre']}: a la papelera.\n"); ver_instaladas()
+            return
         inst = apps_instaladas().get(a["id"]) if a else None
         if not inst:
             return
@@ -857,7 +922,7 @@ def interfaz():
                                            ["flatpak", "update", "--user", "-y", "--noninteractive"]))
 
     for texto, cmd in (("Destacadas", ver_destacadas), ("Buscar…", buscar), ("Instaladas", ver_instaladas),
-                       ("Actualizar todas", actualizar_todas)):
+                       ("Instalar archivo…", instalar_archivo), ("Actualizar todas", actualizar_todas)):
         boton(barra, texto, cmd).pack(side="left", padx=(0, 10), pady=6)
     for texto, cmd in (("Instalar", instalar), ("Abrir", abrir_app), ("Añadir a Steam", steam_app),
                        ("Desinstalar", desinstalar), ("← Volver", lambda: mostrar("inicio"))):

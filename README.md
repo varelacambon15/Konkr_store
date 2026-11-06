@@ -39,6 +39,23 @@ También aparece en el menú del escritorio como **Konkr Store**, si aceptaste c
 **Controles:** flechas o cruceta para moverse · Intro / A para elegir · Esc / B para volver · Steam + X para
 el teclado en pantalla. Los avisos y confirmaciones salen dentro de la propia ventana, con botones grandes.
 
+## Instalar programas desde un archivo (AppImage, .tar.gz, .deb…)
+
+Aplicaciones → **«Instalar archivo…»** muestra los instalables que hay en Descargas, Escritorio y memorias USB / microSD (o escribe
+una ruta). Todo va a `~/Applications/Locales/<Nombre>/`, sin sudo, y se añade a Steam como el resto. Aparecen en «Instaladas»
+(Abrir, Añadir a Steam, Desinstalar → a la papelera).
+
+| Archivo | Qué hace |
+|---|---|
+| **AppImage** | Lo extrae (sin FUSE) y crea su lanzador: ARM64 nativo, o x86_64 con FEX |
+| **.tar.gz / .tar.xz / .tar.zst / .zip** | Lo extrae (sin rutas peligrosas) y busca el programa principal y su arquitectura |
+| **.deb** y **paquetes de Arch** (`.pkg.tar.zst`) | Extrae su contenido en tu carpeta, sin instalarlo en el sistema. Si necesita librerías que SteamOS no tiene, no arrancará |
+| **.flatpak / .flatpakref** | `flatpak install --user` |
+| **.sh** (instaladores tipo GOG) | Lo abre en Konsole para seguir sus pasos (instálalo dentro de `~/Applications`) |
+| **.exe / .msi / .rpm** | No: explica qué hacer |
+
+Desde la terminal: `~/Konkr_store/herramientas/instalar_local.py tipo ARCHIVO` (qué es, sin cambiar nada) o `instalar ARCHIVO`.
+
 ## Recomps en Steam: automático, y sin Proton
 
 **Se añaden solas.** Al cerrar RecompLauncher (y al entrar en Recompilaciones), las recomps instaladas que aún no

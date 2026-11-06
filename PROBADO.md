@@ -38,6 +38,17 @@ scripts que imitan lo justo y registran con qué se les llama.
 - `actualizar.sh` contra un repo git local: sin cambios → `git pull` y se relanza con la versión nueva; con
   cambios locales → no hace pull; con un archivo que se pisaría → git se niega y el script sigue.
 
+### Instalar desde archivo local
+- `instalar_local.py` con archivos de prueba hechos aquí: `.tar.gz` (binario aarch64 + `start.sh` + `lib/`: elige el binario por su nombre,
+  ARM64, icono); `.zip` x86_64 (lanzador con FEX y sin `LD_PRELOAD`, ejecutado con un FEX simulado); `.deb` con xz y con zstd (construidos
+  con `dpkg-deb`; lanzador con sus librerías en `LD_LIBRARY_PATH`); AppImage (cabecera ELF + squashfs; extraído con `unsquashfs`, la
+  arquitectura sale de su contenido); `.zip` con `../` → rechazado; `.exe` → explicado; `.sh` → Konsole.
+- Se corrigieron dos fallos: la arquitectura del AppImage se tomaba de su cabecera y no de su contenido; los `.zst` necesitaban el
+  programa `zstd` (ahora, primero el zstd de Python).
+- En la tienda: «Instalar archivo…» → lista → confirmación → instalado → en «Instaladas» → a Steam automáticamente.
+- No probado: AppImages reales (ni su extracción con `--appimage-extract` cuando no hay `unsquashfs`), `.pkg.tar.zst` de Arch,
+  `.flatpak`, y que los programas instalados así funcionen en la Konkr.
+
 ### Juegos de Switch (nx2konkr) a Steam automáticamente
 - `konkr_store.py switch` / `auto-steam` con un `~/juegos-switch` falso: un juego completo sin permisos de ejecución (como tras un USB)
   → permisos devueltos, acceso con nombre e icono, una copia de seguridad y la petición a Steam; uno a medio copiar → INCOMPLETO, ignorado.
