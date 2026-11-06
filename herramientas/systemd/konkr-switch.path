@@ -1,0 +1,12 @@
+# Konkr Store: vigila ~/juegos-switch; cuando aparece una carpeta nueva arranca konkr-switch.service.
+# Unidad de systemd de USUARIO (~/.config/systemd/user): sin sudo. La instala instalar.sh (paso 8).
+[Unit]
+Description=Konkr Store: juegos de Switch nuevos en ~/juegos-switch
+
+[Path]
+PathChanged=%h/juegos-switch
+MakeDirectory=yes
+Unit=konkr-switch.service
+
+[Install]
+WantedBy=default.target

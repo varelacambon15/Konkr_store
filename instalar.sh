@@ -64,7 +64,7 @@ if [ "$COMPROBAR" = 1 ]; then
 fi
 
 # ---------------------------------------------------------------- 0. comprobaciones
-paso "0/7 Comprobaciones (solo lectura)"
+paso "0/8 Comprobaciones (solo lectura)"
 if [ "$(id -u)" = 0 ]; then mal "No ejecutes esto como root ni con sudo."; exit 1; fi
 echo "    Arquitectura: $(uname -m)"
 FEX="$(command -v FEXInterpreter || command -v FEXLoader || true)"
@@ -78,7 +78,7 @@ YA="$(instalada)"
 [ -n "$YA" ] && echo "    Versión instalada ahora: $YA"
 
 # ---------------------------------------------------------------- 1. carpetas
-paso "1/7 Carpetas en tu usuario: $BASE y ~/recomp"
+paso "1/8 Carpetas en tu usuario: $BASE y ~/recomp"
 if [ -d "$BASE/descargas" ] && [ -d "$HOME/recomp/logs" ]; then
     ok "Ya existen"
 elif preguntar "Crear las carpetas"; then
@@ -89,7 +89,7 @@ else
 fi
 
 # ---------------------------------------------------------------- 2. descarga
-paso "2/7 Obtener el AppImage de RecompLauncher"
+paso "2/8 Obtener el AppImage de RecompLauncher"
 if [ -n "$APPIMAGE_LOCAL" ]; then
     [ -f "$APPIMAGE_LOCAL" ] || { mal "No existe $APPIMAGE_LOCAL"; exit 1; }
     APPIMAGE="$BASE/descargas/$(basename "$APPIMAGE_LOCAL")"
@@ -127,7 +127,7 @@ fi
 chmod u+x "$APPIMAGE"
 
 # ---------------------------------------------------------------- 3. arquitectura
-paso "3/7 Arquitectura del AppImage"
+paso "3/8 Arquitectura del AppImage"
 if command -v file >/dev/null; then file -b "$APPIMAGE" | cut -c1-90 | sed 's/^/    file: /'; fi
 ARCH="$(python3 "$PY" arch "$APPIMAGE")"
 echo "    ELF: $ARCH"
@@ -140,7 +140,7 @@ esac
 # ---------------------------------------------------------------- 4. extraer
 VERSION="$(basename "$APPIMAGE" .AppImage)"
 DEST="$BASE/$VERSION"
-paso "4/7 Extraer el AppImage en $DEST (evita depender de FUSE)"
+paso "4/8 Extraer el AppImage en $DEST (evita depender de FUSE)"
 if [ -e "$DEST/AppRun" ]; then
     ok "Ya estaba extraído"
 elif preguntar "Extraer"; then
@@ -171,7 +171,7 @@ ok "actual -> $VERSION"
 python3 "$PY" "$DEST" | grep -E 'VEREDICTO|FALTAN|FEX:|no comprobadas' | head -15 | sed 's/^/    /' || true
 
 # ---------------------------------------------------------------- 5. lanzador
-paso "5/7 Lanzador: $APPS/lanzar_recomp.sh -> $DIR/lanzar_recomp.sh"
+paso "5/8 Lanzador: $APPS/lanzar_recomp.sh -> $DIR/lanzar_recomp.sh"
 chmod u+x "$DIR"/*.sh "$DIR"/herramientas/*.py 2>/dev/null || true
 if [ -e "$APPS/lanzar_recomp.sh" ] && [ ! -L "$APPS/lanzar_recomp.sh" ]; then
     mal "Ya existe un $APPS/lanzar_recomp.sh que no es un enlace: no lo toco."
@@ -182,7 +182,7 @@ fi
 
 # ---------------------------------------------------------------- 6. arte para Steam
 ARTE="$BASE/arte-steam"
-paso "6/7 (Opcional) Imágenes oficiales para el acceso de Steam: $ARTE"
+paso "6/8 (Opcional) Imágenes oficiales para el acceso de Steam: $ARTE"
 if [ -f "$ARTE/poster.jpg" ] && [ -f "$ARTE/hero.jpg" ] && [ -f "$ARTE/logo.png" ] && [ -f "$ARTE/header.jpg" ]; then
     ok "Ya están descargadas"
 elif preguntar "Descargar portada, fondo, logo y cabecera (≈1 MB)"; then
@@ -196,7 +196,7 @@ else
 fi
 
 # ---------------------------------------------------------------- 7. .desktop
-paso "7/7 (Opcional) Accesos en el menú del escritorio (~/.local/share/applications)"
+paso "7/8 (Opcional) Accesos en el menú del escritorio (~/.local/share/applications)"
 D1="$HOME/.local/share/applications/recomplauncher-fex.desktop"
 D2="$HOME/.local/share/applications/konkr-store.desktop"
 if [ -f "$D1" ] && [ -f "$D2" ]; then
@@ -229,6 +229,28 @@ EOF
     ok "Creados"
 else
     echo "    Omitido."
+fi
+
+# ---------------------------------------------------------------- 8. juegos de Switch automáticos
+UD="$HOME/.config/systemd/user"
+paso "8/8 (Opcional) Juegos de Switch (nx2konkr): al copiar una carpeta a ~/juegos-switch, se añade sola a Steam"
+if ! command -v systemctl >/dev/null 2>&1; then
+    echo "    Sin systemd: se añaden al abrir la tienda o al cerrar RecompLauncher."
+elif [ -f "$UD/konkr-switch.path" ] && systemctl --user is-enabled konkr-switch.path >/dev/null 2>&1; then
+    sed "s|@TIENDA@|$DIR/konkr_store.py|" "$DIR/herramientas/systemd/konkr-switch.service" >"$UD/konkr-switch.service"
+    systemctl --user daemon-reload 2>/dev/null || true
+    ok "Ya está activo (vigilando ~/juegos-switch)"
+elif preguntar "Activar la vigilancia de ~/juegos-switch (servicio de systemd de tu usuario, sin sudo)"; then
+    mkdir -p "$UD" "$HOME/juegos-switch" "$HOME/recomp/logs"
+    cp "$DIR/herramientas/systemd/konkr-switch.path" "$UD/"
+    sed "s|@TIENDA@|$DIR/konkr_store.py|" "$DIR/herramientas/systemd/konkr-switch.service" >"$UD/konkr-switch.service"
+    if systemctl --user daemon-reload && systemctl --user enable --now konkr-switch.path; then
+        ok "Activo: copia una carpeta <Juego>-konkr a ~/juegos-switch y aparecerá en Steam"
+    else
+        mal "systemctl --user falló: se añadirán al abrir la tienda o al cerrar RecompLauncher"
+    fi
+else
+    echo "    Omitido: se añadirán al abrir la tienda (Juegos de Switch) o al cerrar RecompLauncher."
 fi
 
 cat <<EOF

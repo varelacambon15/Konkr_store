@@ -70,6 +70,21 @@ añadirla a Steam: el script decide al arrancar. Para ver qué haría con una re
 ~/Konkr_store/herramientas/jugar_recomp.py ID --info
 ```
 
+## Juegos de Switch (nx2konkr): copiar y listo
+
+Los juegos de Switch que portes en tu PC con **nx2konkr** (repositorio privado `varelacambon15/nx2konkr`, guía `KONKR.md`) salen
+como una carpeta `<Juego>-konkr`. **Cópiala entera a `~/juegos-switch/`** (por USB, la red o la microSD) y no hace falta ningún
+comando: el servicio de vigilancia (instalar.sh, paso 8; un servicio de systemd de tu usuario, sin sudo) espera a que termine la copia,
+devuelve al programa sus permisos de ejecución (se pierden al pasar por un USB de Windows), crea el acceso con su nombre e icono y lo
+añade a Steam, con tu copia de seguridad antes. También se hace al entrar en la sección **Juegos de Switch** de la tienda (Jugar, Ver
+registro, Partidas) y al cerrar RecompLauncher. No muevas la carpeta después: el acceso de Steam apunta a ella. En Steam, sin Proton.
+
+Desde la terminal:
+
+```bash
+~/Konkr_store/konkr_store.py switch
+```
+
 ## Comparar nativo ARM64 contra x86_64 + FEX
 
 En Recompilaciones → **«Comparar ARM vs FEX»**. Por ahora está configurada **Zelda 64: Recompiled**, que

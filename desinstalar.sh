@@ -22,6 +22,13 @@ echo "== RecompLauncher (programa, versiones guardadas, arte) y lanzador"
 preguntar "Quitar ~/Applications/RecompLauncher y ~/Applications/lanzar_recomp.sh" \
     && a_papelera "$HOME/Applications/RecompLauncher" "$HOME/Applications/lanzar_recomp.sh"
 
+echo "== Vigilancia de ~/juegos-switch (servicio de systemd de tu usuario)"
+if [ -f "$HOME/.config/systemd/user/konkr-switch.path" ] && preguntar "Desactivar y quitar la vigilancia de ~/juegos-switch"; then
+    systemctl --user disable --now konkr-switch.path 2>/dev/null || true
+    a_papelera "$HOME/.config/systemd/user/konkr-switch.path" "$HOME/.config/systemd/user/konkr-switch.service"
+    systemctl --user daemon-reload 2>/dev/null || true
+fi
+
 echo "== Accesos del menú y accesos preparados para Steam (~/recomp/accesos)"
 preguntar "Quitar los .desktop de Konkr_store y ~/recomp/accesos" \
     && a_papelera "$HOME/.local/share/applications/recomplauncher-fex.desktop" \

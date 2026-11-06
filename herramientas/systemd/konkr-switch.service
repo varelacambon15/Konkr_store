@@ -1,0 +1,10 @@
+# Konkr Store: espera a que terminen las copias en ~/juegos-switch y añade a Steam lo nuevo (copia de seguridad de Steam antes).
+# @TIENDA@ se sustituye al instalar por la ruta de konkr_store.py.
+[Unit]
+Description=Konkr Store: añadir a Steam los juegos de Switch nuevos
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/env python3 "@TIENDA@" auto-steam --esperar
+StandardOutput=append:%h/recomp/logs/auto_steam.log
+StandardError=append:%h/recomp/logs/auto_steam.log

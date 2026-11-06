@@ -14,7 +14,9 @@ Mando / teclado: flechas para moverse, Intro para elegir, Esc para volver.
 Uso en terminal (sin ventana):
   konkr_store.py estado | versiones | usar VERSION | graficos seguro|normal
   konkr_store.py recomps | acceso-recomp ID | acceso-app ID | acceso-launcher
-  konkr_store.py auto-steam [--forzar]   añade a Steam las recomps nuevas (copia de seguridad antes)
+  konkr_store.py auto-steam [--forzar] [--esperar]   añade a Steam lo nuevo: recomps y juegos de Switch de ~/juegos-switch
+                                                    (copia de seguridad antes; --esperar: a que terminen las copias en curso)
+  konkr_store.py switch                 lista los juegos de Switch de ~/juegos-switch
 """
 import json
 import os
@@ -172,20 +174,87 @@ def recomps_pendientes():
     return [g for g in recomps() if str(ACCESOS / f"{nombre_archivo('recomp-' + g['id'])}.desktop") not in ya]
 
 
+# ---- Juegos de Switch portados con nx2konkr: una carpeta por juego en ~/juegos-switch (dmhost, jugar.sh, mods/, env.txt...) ----
+SWITCH = Path(os.environ.get("KONKR_SWITCH", HOME / "juegos-switch"))
+SWITCH_NECESARIOS = ("dmhost", "jugar.sh", "env.txt", "mods", "nx2a-data.json")
+
+
+def juegos_switch():
+    """Carpetas de juegos portados en SWITCH: dict(carpeta, nombre, id, version, completo)."""
+    out = []
+    if not SWITCH.is_dir():
+        return out
+    for d in sorted(SWITCH.iterdir()):
+        if not d.is_dir() or not (d / "dmhost").exists() and not (d / "jugar.sh").exists():
+            continue
+        try:
+            man = json.loads((d / "nx2a-data.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            man = {}
+        out.append({"carpeta": d, "nombre": man.get("name") or d.name, "id": man.get("title_id", ""), "version": man.get("display", ""),
+                    "completo": all((d / n).exists() for n in SWITCH_NECESARIOS)})
+    return out
+
+
+def acceso_switch(j):
+    d = j["carpeta"]
+    for n in ("dmhost", "jugar.sh"):          # una copia por USB (exFAT/NTFS) pierde el permiso de ejecución
+        try:
+            (d / n).chmod((d / n).stat().st_mode | 0o755)
+        except OSError:
+            pass
+    icono = d / "icon.png"
+    return escribir_desktop(f"nx-{d.name}", j["nombre"], f'"{d / "jugar.sh"}"', str(icono) if icono.exists() else "applications-games")
+
+
+def switch_pendientes():
+    ya = anadidos()
+    return [j for j in juegos_switch() if j["completo"] and str(ACCESOS / f"{nombre_archivo('nx-' + j['carpeta'].name)}.desktop") not in ya]
+
+
+def tamano(d):
+    t = 0
+    for raiz, _c, fs in os.walk(d):
+        for f in fs:
+            try:
+                t += os.lstat(os.path.join(raiz, f)).st_size
+            except OSError:
+                pass
+    return t
+
+
+def esperar_copias(decir=print, quieto=None, maximo=7200):
+    """Espera a que ~/juegos-switch deje de cambiar de tamaño (una copia en curso) durante `quieto` segundos."""
+    quieto = quieto if quieto is not None else int(os.environ.get("KONKR_QUIETO", "30"))
+    antes, estable, t0 = -1, 0, time.time()
+    while time.time() - t0 < maximo:
+        ahora = tamano(SWITCH) if SWITCH.is_dir() else 0
+        estable = estable + 5 if ahora == antes else 0
+        if estable >= quieto:
+            return True
+        if antes >= 0 and ahora != antes and estable == 0:
+            decir(f"Copiando en {SWITCH}… ({ahora / 2**30:.1f} GB)")
+        antes = ahora
+        time.sleep(5)
+    return False
+
+
 def steam_abierto():
     return any(sh(["pgrep", "-x", n])[0] == 0 for n in ("steam", "steamwebhelper"))
 
 
 def auto_steam(decir=print):
-    """Añade a Steam las recomps instaladas que aún no tienen acceso: una copia de seguridad por tanda y luego
-    una petición a Steam por recomp (herramientas/anadir_a_steam.sh). Devuelve 0 hecho/nada que hacer,
-    3 Steam cerrado (quedan pendientes), 4 falló la copia, 5 no hay copia de seguridad, 6 ya hay otra tanda en marcha."""
+    """Añade a Steam lo instalado que aún no tiene acceso: recomps de RecompLauncher y juegos de Switch de ~/juegos-switch
+    (nx2konkr). Una copia de seguridad por tanda y luego una petición a Steam por juego (herramientas/anadir_a_steam.sh).
+    Devuelve 0 hecho/nada que hacer, 3 Steam cerrado (quedan pendientes), 4 falló la copia, 5 no hay copia de seguridad,
+    6 ya hay otra tanda en marcha."""
     import fcntl
-    pend = recomps_pendientes()
+    pend = [(g["nombre"], lambda g=g: acceso_recomp(g["id"])) for g in recomps_pendientes()]
+    pend += [(j["nombre"] + " (Switch)", lambda j=j: acceso_switch(j)) for j in switch_pendientes()]
     if not pend:
-        decir("No hay recomps nuevas sin acceso en Steam.")
+        decir("No hay nada nuevo sin acceso en Steam.")
         return 0
-    decir(f"Recomps nuevas sin acceso en Steam: {', '.join(g['nombre'] for g in pend)}")
+    decir(f"Nuevo sin acceso en Steam: {', '.join(n for n, _ in pend)}")
     if not steam_abierto():
         decir("Steam no está abierto: se añadirán la próxima vez.")
         return 3
@@ -197,7 +266,7 @@ def auto_steam(decir=print):
     try:
         fcntl.flock(cerrojo, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError:
-        decir("Ya hay otra tanda añadiendo recomps.")
+        decir("Ya hay otra tanda añadiendo a Steam.")
         return 6
     decir(f"Copia de seguridad de Steam: {RESPALDO}")
     c, out = sh(["bash", str(RESPALDO)], timeout=600)
@@ -207,14 +276,14 @@ def auto_steam(decir=print):
         decir("La copia de seguridad falló: no se añade nada.")
         return 4
     entorno = dict(os.environ, KONKR_RESPALDO_HECHO="1")
-    for g in pend:
+    for nombre, crear in pend:
         try:
-            acc = acceso_recomp(g["id"])
-        except ValueError as e:
-            decir(f"{g['nombre']}: {e}")
+            acc = crear()
+        except (ValueError, OSError) as e:
+            decir(f"{nombre}: {e}")
             continue
         r = subprocess.run(["bash", str(ANADIR), str(acc)], capture_output=True, text=True, env=entorno)
-        decir(f"{g['nombre']}: {'pedido a Steam' if r.returncode == 0 else 'no se pudo (' + (r.stdout + r.stderr).strip().splitlines()[-1] + ')'}")
+        decir(f"{nombre}: {'pedido a Steam' if r.returncode == 0 else 'no se pudo (' + (r.stdout + r.stderr).strip().splitlines()[-1] + ')'}")
         time.sleep(1.5)                  # una petición tras otra, sin amontonarlas en Steam
     return 0
 
@@ -604,10 +673,11 @@ def interfaz():
     tiles = []
     for texto, destino in (("Aplicaciones\n\nTipo Discover:\napps de Flathub", "apps"),
                            ("Recompilaciones\n\nJuegos recompilados\ncon RecompLauncher", "recomps"),
+                           ("Juegos de Switch\n\nTus juegos portados\ncon nx2konkr", "switch"),
                            ("Herramientas\n\nActualizar, versiones,\ndiagnóstico…", "herr")):
-        t = boton(fila, texto, lambda d=destino: mostrar(d), ancho=18, alto=6)
+        t = boton(fila, texto, lambda d=destino: mostrar(d), ancho=22, alto=4)
         t.configure(font=("sans", 20, "bold"))
-        t.pack(side="left", padx=18, pady=18)
+        t.grid(row=len(tiles) // 2, column=len(tiles) % 2, padx=14, pady=12)   # 2 x 2: cabe en cualquier pantalla
         tiles.append(t)
     tk.Label(m, text="Flechas: moverse · Intro: elegir · Esc: volver/salir · Teclado en pantalla: Steam + X",
              font=("sans", 13), bg=FONDO, fg="#8f98a0").pack(side="bottom", pady=12)
@@ -952,6 +1022,76 @@ def interfaz():
     pantallas["recomps"] = {"marco": m, "foco": lambda: lb_rec,
                             "al_entrar": lambda: pintar_recomps(avisar=True)}
 
+    # ================= JUEGOS DE SWITCH (nx2konkr)
+    m = tk.Frame(raiz, bg=FONDO)
+    cabecera(m, "Juegos de Switch")
+    lb_sw = lista(m)
+    lb_sw.pack(fill="both", expand=True, padx=24, pady=6)
+    acciones = tk.Frame(m, bg=FONDO)
+    acciones.pack(fill="x", padx=24)
+    sal_sw = caja_texto(m, 8)
+    sal_sw.pack(fill="x", padx=24, pady=(6, 16))
+    sw_vista = []
+
+    def pintar_switch(auto=False, limpiar=True):
+        sw_vista.clear()
+        sw_vista.extend(juegos_switch())
+        ya = anadidos()
+        lb_sw.delete(0, "end")
+        for j in sw_vista:
+            en = str(ACCESOS / f"{nombre_archivo('nx-' + j['carpeta'].name)}.desktop") in ya
+            lb_sw.insert("end", f"{'★ ' if en else '   '}{j['nombre']}   {j['version']}" + ("" if j["completo"] else "   [incompleto: ¿se está copiando?]"))
+        if sw_vista:
+            lb_sw.selection_set(0)
+            lb_sw.activate(0)
+            escribir(sal_sw, f"{len(sw_vista)} juego(s) en {SWITCH} (★ = ya en Steam). Copia aquí la carpeta <Juego>-konkr que genera "
+                             "nx2konkr en tu PC y se añade sola a Steam.\n", limpiar=limpiar)
+        else:
+            escribir(sal_sw, f"Aún no hay juegos. Copia a {SWITCH} la carpeta <Juego>-konkr que genera nx2konkr en tu PC: "
+                             "se añadirá sola a Steam.\n", limpiar=True)
+        if auto and auto_activo() and switch_pendientes() and not ocupado["v"]:
+            tarea(sal_sw, "Añadir juegos nuevos a Steam (automático)", [sys.executable, str(DIR / "konkr_store.py"), "auto-steam"],
+                  lambda c: pintar_switch(limpiar=False))
+
+    def sw_sel():
+        s = lb_sw.curselection()
+        return sw_vista[s[0]] if s and s[0] < len(sw_vista) else None
+
+    def jugar_switch():
+        j = sw_sel()
+        if j and j["completo"]:
+            acceso_switch(j)                 # deja los permisos de ejecución bien
+            lanzar([str(j["carpeta"] / "jugar.sh")], sal_sw, j["nombre"])
+        elif j:
+            info("Juegos de Switch", "Esta carpeta está incompleta: espera a que termine de copiarse.")
+
+    def steam_switch():
+        j = sw_sel()
+        if j and j["completo"]:
+            pedir_steam(sal_sw, acceso_switch(j), j["nombre"], lambda c: pintar_switch(limpiar=False))
+
+    def registro_switch():
+        j = sw_sel()
+        if not j:
+            return
+        try:
+            lineas = (j["carpeta"] / "log.txt").read_text(errors="replace").splitlines()[-120:]
+            escribir(sal_sw, f"=== {j['carpeta'] / 'log.txt'} (últimas líneas) ===\n" + "\n".join(lineas) + "\n", limpiar=True)
+        except OSError:
+            escribir(sal_sw, "Aún no hay registro: el juego no se ha abierto.\n", limpiar=True)
+
+    def partidas_switch():
+        j = sw_sel()
+        if j:
+            d = HOME / ".local/share/nx2konkr" / j["carpeta"].name / "save"
+            d.mkdir(parents=True, exist_ok=True)
+            lanzar(["xdg-open", str(d)], sal_sw, f"partidas de {j['nombre']}")
+
+    for texto, cmd in (("Jugar", jugar_switch), ("Añadir a Steam", steam_switch), ("Ver registro", registro_switch),
+                       ("Partidas", partidas_switch), ("← Volver", lambda: mostrar("inicio"))):
+        boton(acciones, texto, cmd).pack(side="left", padx=(0, 10), pady=6)
+    pantallas["switch"] = {"marco": m, "foco": lambda: lb_sw, "al_entrar": lambda: pintar_switch(auto=True)}
+
     # ================= HERRAMIENTAS
     m = tk.Frame(raiz, bg=FONDO)
     cabecera(m, "Herramientas")
@@ -1019,8 +1159,8 @@ def interfaz():
     def cambiar_auto():
         poner_auto(not auto_activo())
         escribir(sal_h, f"\nAñadir a Steam automáticamente: {'sí' if auto_activo() else 'no'}\n"
-                        "(las apps al instalarlas; las recomps al cerrar RecompLauncher y al entrar en Recompilaciones;\n"
-                        " siempre con copia de seguridad antes)\n")
+                        "(las apps al instalarlas; las recomps al cerrar RecompLauncher; los juegos de Switch al copiarlos a\n"
+                        " ~/juegos-switch; y todo al entrar en su sección. Siempre con copia de seguridad antes)\n")
 
     def launcher_a_steam():
         if hay_launcher():
@@ -1035,13 +1175,13 @@ def interfaz():
     bh = []
     for i, (texto, cmd) in enumerate(botones_h):
         b = boton(rejilla, texto, cmd, ancho=26)
-        b.grid(row=i // 3, column=i % 3, padx=6, pady=6, sticky="we")
+        b.grid(row=i // 2, column=i % 2, padx=6, pady=5, sticky="we")   # 2 columnas: caben también en una ventana de 1280 px
         bh.append(b)
     pantallas["herr"] = {"marco": m, "foco": lambda: bh[0],
                          "al_entrar": lambda: escribir(sal_h, f"RecompLauncher: {version_actual() or 'no instalado'}"
                                                               f"\nVersiones guardadas: {len(versiones())}"
                                                               f"\nModo gráfico: {modo_grafico()}"
-                                                              f"\nA Steam automáticamente (apps y recomps): {'sí' if auto_activo() else 'no'}\n", limpiar=True)}
+                                                              f"\nA Steam automáticamente (apps, recomps y juegos de Switch): {'sí' if auto_activo() else 'no'}\n", limpiar=True)}
 
     mostrar("inicio")
     raiz.mainloop()
@@ -1077,12 +1217,20 @@ def cli(argv):
         print(acceso_app(argv[1]))
     elif cmd == "acceso-launcher":
         print(acceso_launcher())
+    elif cmd == "switch":
+        ya = anadidos()
+        for j in juegos_switch():
+            en = str(ACCESOS / f"{nombre_archivo('nx-' + j['carpeta'].name)}.desktop") in ya
+            print(f"{'★' if en else ' '} {j['nombre']}\t{j['id']}\t{j['version']}\t{'completo' if j['completo'] else 'INCOMPLETO'}\t{j['carpeta']}")
     elif cmd == "auto-steam":
         if not auto_activo() and "--forzar" not in argv:
             print("Añadir recomps a Steam automáticamente está desactivado (Herramientas).")
             return 0
-        print(time.strftime("== %Y-%m-%d %H:%M:%S auto-steam"))
-        return auto_steam()
+        print(time.strftime("== %Y-%m-%d %H:%M:%S auto-steam"), flush=True)
+        if "--esperar" in argv and not esperar_copias(lambda m: print(m, flush=True)):
+            print("La copia no terminó en 2 horas: se intentará la próxima vez.")
+            return 0
+        return auto_steam(lambda m: print(m, flush=True))
     else:
         print(__doc__)
         return 1

@@ -38,6 +38,15 @@ scripts que imitan lo justo y registran con qué se les llama.
 - `actualizar.sh` contra un repo git local: sin cambios → `git pull` y se relanza con la versión nueva; con
   cambios locales → no hace pull; con un archivo que se pisaría → git se niega y el script sigue.
 
+### Juegos de Switch (nx2konkr) a Steam automáticamente
+- `konkr_store.py switch` / `auto-steam` con un `~/juegos-switch` falso: un juego completo sin permisos de ejecución (como tras un USB)
+  → permisos devueltos, acceso con nombre e icono, una copia de seguridad y la petición a Steam; uno a medio copiar → INCOMPLETO, ignorado.
+- `auto-steam --esperar`: esperó a que una copia en curso terminara (26 s con 10 s de calma) y luego lo añadió.
+- La sección «Juegos de Switch» en la tienda (pantalla virtual) y el inicio en 2 × 2 (con 4 recuadros, el cuarto se cortaba a 1280 px).
+  Herramientas pasa a 2 columnas (también se cortaba).
+- No probado: las unidades de systemd (`konkr-switch.path` y `.service`; este contenedor no tiene systemd de usuario) y que Steam
+  acepte la petición lanzada desde un servicio en segundo plano.
+
 ### Recomps a Steam automáticamente y Linux/Windows
 - Apps: tras «Instalar» (flatpak simulado), se añaden a Steam sin diálogo (copia de seguridad y petición a Steam), con
   «A Steam: automático» activado; desactivado, pregunta como antes.
