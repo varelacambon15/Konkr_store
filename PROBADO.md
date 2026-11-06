@@ -38,6 +38,21 @@ scripts que imitan lo justo y registran con qué se les llama.
 - `actualizar.sh` contra un repo git local: sin cambios → `git pull` y se relanza con la versión nueva; con
   cambios locales → no hace pull; con un archivo que se pisaría → git se niega y el script sigue.
 
+### Comparar ARM64 vs FEX
+- Comprobado en el repositorio de Zelda 64: Recompiled (commit `b65c482`, 25-09-2026): su CI compila
+  **Linux ARM64** (Ubuntu 22.04) y x86_64. Su README: «ARM64 builds will work on any ARM64 CPU».
+- `comparar_recomp.py` con una release simulada que imita su empaquetado (un `.zip` con un `.tar.gz` dentro):
+  elige bien las builds Linux ARM64 y X64 (descarta Windows, AppImage y Debug), verifica el SHA-256, extrae,
+  comprueba la arquitectura real (aarch64 real / x86_64 real), crea los accesos y no repite trabajo la
+  segunda vez. Se corrigió un fallo (la extracción del `.tar.gz` interior se llamaba a sí misma sin fin) y
+  ahora una extracción a medias no se da por buena.
+- Rechaza un `.zip` malicioso con rutas `../`.
+- `medir_y_lanzar.sh` con batería, sensores y `/proc/stat` simulados: CSV cada N segundos, resumen
+  (W, °C, CPU %); ARM conserva `LD_PRELOAD` (overlay de Steam), x86_64 lo quita y usa FEX.
+- `resumen`: tabla y consumo medio ponderado.
+- En la tienda (pantalla virtual, teclado): Comparar → confirmación → preparar → añadir los dos accesos a
+  Steam uno tras otro. Se acortaron etiquetas porque un botón se cortaba a 1280 px.
+
 ### Resto
 - `instalar.sh --si --appimage …` completo (versión anterior): carpetas, copia, arquitectura, extracción con
   FEX simulado, enlaces, `.desktop`. Se niega a ejecutarse como root.
@@ -63,3 +78,8 @@ scripts que imitan lo justo y registran con qué se les llama.
 - Descargar el AppImage real de RecompLauncher (la red de esta sesión no llega a las descargas de GitHub) y
   `instalar.sh --comprobar` contra la API real.
 - Las recomps en sí: ninguna instalada ni jugada.
+- **Los nombres reales de los archivos de la release de Zelda 64** (las páginas de releases de GitHub están
+  bloqueadas en esta sesión). Si no coinciden con los patrones de `datos/comparar.json`, la herramienta lo
+  dice y muestra la lista de archivos de la release.
+- Que la build ARM64 de Zelda 64 (compilada en Ubuntu 22.04) arranque en SteamOS ARM con Turnip (Vulkan), y
+  que los sensores de batería y temperatura de la KONKR estén en las rutas estándar de `/sys`.

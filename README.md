@@ -39,6 +39,38 @@ También aparece en el menú del escritorio como **Konkr Store**, si aceptaste c
 **Controles:** flechas o cruceta para moverse · Intro / A para elegir · Esc / B para volver · Steam + X para
 el teclado en pantalla. Los avisos y confirmaciones salen dentro de la propia ventana, con botones grandes.
 
+## Comparar nativo ARM64 contra x86_64 + FEX
+
+En Recompilaciones → **«Comparar ARM vs FEX»**. Por ahora está configurada **Zelda 64: Recompiled**, que
+publica las dos builds de Linux. La tienda:
+
+1. Descarga de su GitHub la build **ARM64** y la **x86_64** de la última release a `~/recomp/comparar/zelda64/`.
+   Comprueba el SHA-256 si GitHub lo publica, y la arquitectura real de cada programa.
+2. Crea dos accesos, «Zelda 64: Recompiled (ARM64 nativo)» y «Zelda 64: Recompiled (x86_64 + FEX)», y ofrece
+   añadirlos a Steam.
+3. Cada vez que juegas desde esos accesos, mide cada 5 s el **consumo de batería (W)**, la **temperatura
+   máxima** y el **uso de CPU**, y lo guarda en `~/recomp/comparar/zelda64/medidas/`.
+4. **«Resultados»** muestra la tabla de partidas y el consumo medio de cada versión.
+
+Para que la comparación sea justa: juega lo mismo (misma zona, mismo tiempo) con cada versión, con el mismo
+brillo y el mismo TDP. Los **FPS** se ven con el indicador de rendimiento de Steam (botón ··· → batería →
+nivel de superposición). Las dos versiones comparten partidas (`~/.config/Zelda64Recompiled/saves`).
+
+**Archivo del juego que pide:** tu copia de *Majora's Mask* de N64, **versión norteamericana (US)**. Mejor en
+`.z64`; otros formatos los convierte sola. Ninguna otra versión ni ROM vale.
+
+Desde la terminal:
+
+```bash
+~/Konkr_store/herramientas/comparar_recomp.py preparar zelda64
+```
+
+```bash
+~/Konkr_store/herramientas/comparar_recomp.py resumen zelda64
+```
+
+Se pueden añadir más recomps a `datos/comparar.json` si publican build Linux ARM64 y x86_64.
+
 ## Añadir cosas a Steam (cómo funciona y por qué es seguro)
 
 Cuando instalas una app o una recomp, la tienda pregunta si quieres añadirla a Steam. Si dices que sí:
@@ -174,5 +206,8 @@ desde Steam.
 | `herramientas/revisar_binarios.py` | Revisa la arquitectura y las librerías de una recomp |
 | `herramientas/releases.py` | Consulta las versiones de RecompLauncher en GitHub |
 | `datos/aplicaciones.json` | Lista de aplicaciones destacadas (edítala a tu gusto) |
+| `herramientas/comparar_recomp.py` | Descarga y prepara las builds ARM64 y x86_64 de una recomp para compararlas |
+| `herramientas/medir_y_lanzar.sh` | Lanza una build (nativa o con FEX) midiendo batería, temperatura y CPU |
+| `datos/comparar.json` | Recomps disponibles para comparar |
 
 Qué se ha probado y qué no: [PROBADO.md](PROBADO.md).

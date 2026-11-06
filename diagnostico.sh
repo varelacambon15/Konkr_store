@@ -43,6 +43,15 @@ else
     echo "flatpak: -- no --"
 fi
 
+t "Sensores (para comparar ARM64 vs FEX)"
+for b in /sys/class/power_supply/*; do
+    [ -e "$b/type" ] || continue
+    printf '  %-28s tipo=%s capacidad=%s power_now=%s current_now=%s voltage_now=%s\n' "$(basename "$b")" \
+        "$(cat "$b/type" 2>/dev/null)" "$(cat "$b/capacity" 2>/dev/null)" "$(cat "$b/power_now" 2>/dev/null)" \
+        "$(cat "$b/current_now" 2>/dev/null)" "$(cat "$b/voltage_now" 2>/dev/null)"
+done
+echo "  Zonas térmicas: $(ls -d /sys/class/thermal/thermal_zone* 2>/dev/null | wc -l)  máx: $(cat /sys/class/thermal/thermal_zone*/temp 2>/dev/null | sort -n | tail -1)"
+
 t "Herramientas que usa el instalador"
 for b in git curl python3 file unsquashfs zenity kdialog; do
     printf '%-12s %s\n' "$b" "$(command -v "$b" || echo '-- no --')"

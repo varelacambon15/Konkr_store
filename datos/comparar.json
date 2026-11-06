@@ -1,0 +1,14 @@
+{
+  "nota": "Recomps que publican build Linux ARM64 y x86_64, para compararlas en la consola. Patrones en minúsculas: todas las palabras de 'incluye' deben aparecer en el nombre del archivo y ninguna de 'excluye'.",
+  "recomps": [
+    {
+      "id": "zelda64",
+      "nombre": "Zelda 64: Recompiled",
+      "repo": "Zelda64Recomp/Zelda64Recomp",
+      "programa": "Zelda64Recompiled",
+      "juego": "Tu copia de Majora's Mask de N64, versión norteamericana (US). Mejor en .z64; otros formatos los convierte sola.",
+      "arm64": {"incluye": ["linux", "arm64"], "excluye": ["appimage", "debug", "flatpak"]},
+      "x64":   {"incluye": ["linux", "x64"],   "excluye": ["appimage", "debug", "flatpak"]}
+    }
+  ]
+}

@@ -755,8 +755,56 @@ def interfaz():
             tarea(sal_rec, f"Revisar {g['nombre']}",
                   [sys.executable, str(DIR / "herramientas/revisar_binarios.py"), g["ruta"]])
 
-    for texto, cmd in (("Descargar recomps (RecompLauncher)", descargar_recomps),
-                       ("Recargar", lambda: pintar_recomps(avisar=True))):
+    COMPARAR_PY = DIR / "herramientas/comparar_recomp.py"
+
+    def receta_elegida():
+        try:
+            rs = json.loads((DIR / "datos/comparar.json").read_text(encoding="utf-8"))["recomps"]
+        except (OSError, ValueError, KeyError):
+            rs = []
+        if not rs:
+            info("Comparar", "No hay recomps configuradas en datos/comparar.json.")
+            return None
+        if len(rs) == 1:
+            return rs[0]
+        i = elegir_de("Comparar", "¿Qué recomp quieres comparar?", [r["nombre"] for r in rs])
+        return rs[i] if i is not None else None
+
+    def comparar():
+        r = receta_elegida()
+        if not r:
+            return
+        if not si_no("Comparar ARM64 nativo vs x86_64 + FEX",
+                     f"Se descargarán las dos builds de Linux de {r['nombre']} (de su GitHub) a "
+                     f"~/recomp/comparar/{r['id']}/ y se crearán dos accesos que miden batería, temperatura y "
+                     f"CPU mientras juegas.\n\nPara jugar necesitas: {r['juego']}\n\n¿Continuar?"):
+            return
+        accesos = [ACCESOS / f"comparar-{r['id']}-arm64.desktop", ACCESOS / f"comparar-{r['id']}-x64.desktop"]
+
+        def anadir(i):
+            if i < len(accesos):
+                nombre = f"{r['nombre']} ({'ARM64 nativo' if i == 0 else 'x86_64 + FEX'})"
+                pedir_steam(sal_rec, accesos[i], nombre, lambda c: anadir(i + 1))
+                if ocupado["v"] is False:          # dijo que no a esta: se pregunta por la siguiente
+                    anadir(i + 1)
+
+        def fin(codigo):
+            if codigo == 0 and all(a.exists() for a in accesos):
+                escribir(sal_rec, "\nJuega un rato con cada versión (mismo sitio del juego) y luego pulsa "
+                                  "«Resultados comparación». Los FPS, con el indicador de rendimiento de Steam.\n")
+                anadir(0)
+        tarea(sal_rec, f"Preparar comparación de {r['nombre']}",
+              [sys.executable, str(COMPARAR_PY), "preparar", r["id"]], fin)
+
+    def resultados():
+        r = receta_elegida()
+        if r:
+            escribir(sal_rec, "", limpiar=True)
+            tarea(sal_rec, f"Resultados: {r['nombre']}", [sys.executable, str(COMPARAR_PY), "resumen", r["id"]])
+
+    for texto, cmd in (("Descargar recomps", descargar_recomps),
+                       ("Recargar", lambda: pintar_recomps(avisar=True)),
+                       ("Comparar ARM vs FEX", comparar), ("Resultados", resultados)):
         boton(barra, texto, cmd).pack(side="left", padx=(0, 10), pady=6)
     for texto, cmd in (("Jugar", jugar), ("Añadir a Steam", steam_rec), ("Revisar binarios", revisar),
                        ("← Volver", lambda: mostrar("inicio"))):
