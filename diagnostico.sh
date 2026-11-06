@@ -29,6 +29,20 @@ t "Steam: herramientas de compatibilidad (solo listado)"
 ls -la ~/.local/share/Steam/compatibilitytools.d/ 2>/dev/null || echo "no existe"
 ls -d ~/.local/share/Steam/steamapps/common/Proton* 2>/dev/null
 
+t "Steam y Flatpak (para la tienda)"
+printf '%-22s %s\n' "steam" "$(command -v steam || echo '-- no --')"
+printf '%-22s %s\n' "steamos-add-to-steam" "$(command -v steamos-add-to-steam || echo '-- no --')"
+printf '%-22s %s\n' "Steam abierto" "$(pgrep -x steam >/dev/null && echo sí || echo no)"
+printf '%-22s %s\n' "copia de Steam" "$( [ -f ~/iw6x-steamos/tools/respaldo_steam.sh ] && echo ~/iw6x-steamos/tools/respaldo_steam.sh || echo '-- no encontrada --')"
+if command -v flatpak >/dev/null; then
+    flatpak --version
+    echo "Remotos de usuario:";  flatpak remotes --user --columns=name,url 2>/dev/null | sed 's/^/  /'
+    echo "Remotos de sistema:";  flatpak remotes --system --columns=name,url 2>/dev/null | sed 's/^/  /'
+    echo "Apps instaladas: $(flatpak list --app --columns=application 2>/dev/null | wc -l)"
+else
+    echo "flatpak: -- no --"
+fi
+
 t "Herramientas que usa el instalador"
 for b in git curl python3 file unsquashfs zenity kdialog; do
     printf '%-12s %s\n' "$b" "$(command -v "$b" || echo '-- no --')"

@@ -1,33 +1,39 @@
 #!/usr/bin/env bash
-# Instalador de RecompLauncher para la KONKR Pocket FIT (SteamOS ARM + FEX).
+# Instalador / actualizador de RecompLauncher para la KONKR Pocket FIT (SteamOS ARM + FEX).
 #
 #   ./instalar.sh                    pregunta antes de cada paso
-#   ./instalar.sh --si               no pregunta
+#   ./instalar.sh --si               no pregunta (lo usa el panel tras confirmar en su ventana)
 #   ./instalar.sh --appimage RUTA    usa un AppImage ya descargado en vez de bajarlo
+#   ./instalar.sh --comprobar        solo dice si hay versión nueva (no cambia nada)
+#                                    salida: 0 = al día, 10 = hay versión nueva, 2 = error
 #
-# Qué hace (todo dentro de tu carpeta de usuario):
+# Qué crea (todo dentro de tu carpeta de usuario):
 #   ~/Applications/RecompLauncher/descargas/   el AppImage descargado
-#   ~/Applications/RecompLauncher/<versión>/   el AppImage extraído
+#   ~/Applications/RecompLauncher/<versión>/   el AppImage extraído (las versiones viejas se quedan)
 #   ~/Applications/RecompLauncher/actual       enlace a la versión en uso
+#   ~/Applications/RecompLauncher/arte-steam/  imágenes oficiales para ponerlas tú en Steam
 #   ~/Applications/lanzar_recomp.sh            enlace al lanzador de este repo
 #   ~/recomp/{biblioteca,logs,informes}        carpetas de trabajo
-#   ~/.local/share/applications/recomplauncher-fex.desktop   (opcional)
+#   ~/.local/share/applications/*.desktop      accesos en el menú (opcional)
 # NO usa sudo, NO toca Steam, NO borra nada.
 set -euo pipefail
 
-REPO_LAUNCHER="elripalda/RecompLauncher"
 DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 PY="$DIR/herramientas/revisar_binarios.py"
+REL="$DIR/herramientas/releases.py"
+ARTE_URL="https://raw.githubusercontent.com/elripalda/RecompLauncher/main/src-tauri/steam-art"
 APPS="$HOME/Applications"
 BASE="$APPS/RecompLauncher"
 SI=0
+COMPROBAR=0
 APPIMAGE_LOCAL=""
 
 while [ $# -gt 0 ]; do
     case "$1" in
         --si|-y) SI=1 ;;
-        --appimage) APPIMAGE_LOCAL="$(readlink -f "$2")"; shift ;;
-        -h|--help) sed -n 2,20p "$0"; exit 0 ;;
+        --comprobar) COMPROBAR=1 ;;
+        --appimage) APPIMAGE_LOCAL="$(readlink -f "${2:?Falta la ruta del AppImage}")"; shift ;;
+        -h|--help) sed -n 2,19p "$0"; exit 0 ;;
         *) echo "Opción desconocida: $1"; exit 1 ;;
     esac
     shift
@@ -42,9 +48,23 @@ preguntar() {
     read -r -p "    ¿$1? [s/N] " r </dev/tty || return 1
     [[ "$r" =~ ^[sSyY] ]]
 }
+instalada() { [ -L "$BASE/actual" ] && basename "$(readlink "$BASE/actual")" || true; }
+
+# ---------------------------------------------------------------- solo comprobar
+if [ "$COMPROBAR" = 1 ]; then
+    YA="$(instalada)"
+    echo "Instalada:  ${YA:-ninguna}"
+    INFO="$(python3 "$REL" ultima)" || exit 2
+    IFS=$'\t' read -r TAG NOMBRE _ _ <<<"$INFO"
+    echo "Disponible: $TAG ($NOMBRE)"
+    if [ "$(python3 "$REL" comparar "${YA:-}" "$NOMBRE")" = "nueva" ]; then
+        echo "HAY VERSIÓN NUEVA"; exit 10
+    fi
+    echo "Estás al día"; exit 0
+fi
 
 # ---------------------------------------------------------------- 0. comprobaciones
-paso "0/6 Comprobaciones (solo lectura)"
+paso "0/7 Comprobaciones (solo lectura)"
 if [ "$(id -u)" = 0 ]; then mal "No ejecutes esto como root ni con sudo."; exit 1; fi
 echo "    Arquitectura: $(uname -m)"
 FEX="$(command -v FEXInterpreter || command -v FEXLoader || true)"
@@ -54,10 +74,14 @@ for b in curl python3; do
     command -v "$b" >/dev/null || { mal "Falta $b"; exit 1; }
 done
 ok "curl y python3 presentes"
+YA="$(instalada)"
+[ -n "$YA" ] && echo "    Versión instalada ahora: $YA"
 
 # ---------------------------------------------------------------- 1. carpetas
-paso "1/6 Crear carpetas en tu usuario: $BASE y ~/recomp"
-if preguntar "Crear las carpetas"; then
+paso "1/7 Carpetas en tu usuario: $BASE y ~/recomp"
+if [ -d "$BASE/descargas" ] && [ -d "$HOME/recomp/logs" ]; then
+    ok "Ya existen"
+elif preguntar "Crear las carpetas"; then
     mkdir -p "$BASE/descargas" "$HOME/recomp/biblioteca" "$HOME/recomp/logs" "$HOME/recomp/informes"
     ok "Hecho"
 else
@@ -65,7 +89,7 @@ else
 fi
 
 # ---------------------------------------------------------------- 2. descarga
-paso "2/6 Obtener el AppImage de RecompLauncher"
+paso "2/7 Obtener el AppImage de RecompLauncher"
 if [ -n "$APPIMAGE_LOCAL" ]; then
     [ -f "$APPIMAGE_LOCAL" ] || { mal "No existe $APPIMAGE_LOCAL"; exit 1; }
     APPIMAGE="$BASE/descargas/$(basename "$APPIMAGE_LOCAL")"
@@ -75,23 +99,9 @@ if [ -n "$APPIMAGE_LOCAL" ]; then
     ok "Uso el archivo indicado (copiado a $APPIMAGE)"
     sha256sum "$APPIMAGE"
 else
-    echo "    Consultando las releases de github.com/$REPO_LAUNCHER (incluye betas)…"
-    JSON="$(curl -fsSL -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/$REPO_LAUNCHER/releases?per_page=10")" \
+    echo "    Consultando las releases de github.com/elripalda/RecompLauncher (incluye betas)…"
+    INFO="$(python3 "$REL" ultima)" \
         || { mal "No pude consultar GitHub. Descarga el AppImage a mano y usa --appimage RUTA."; exit 1; }
-    # Elige el AppImage más reciente; si alguna release trae uno ARM64 (aarch64/arm64), lo prefiere.
-    INFO="$(printf '%s' "$JSON" | python3 -c '
-import json, sys
-rels = json.load(sys.stdin)
-for r in rels:
-    if r.get("draft"): continue
-    ais = [a for a in r.get("assets", []) if a["name"].lower().endswith(".appimage")]
-    if not ais: continue
-    arm = [a for a in ais if any(k in a["name"].lower() for k in ("aarch64", "arm64"))]
-    a = (arm or ais)[0]
-    print(r["tag_name"], a["name"], a["browser_download_url"], (a.get("digest") or "").replace("sha256:", "") or "-", sep="\t")
-    break
-')"
-    [ -n "$INFO" ] || { mal "No encontré ningún AppImage en las últimas releases. Mira https://github.com/$REPO_LAUNCHER/releases"; exit 1; }
     IFS=$'\t' read -r TAG NOMBRE URL SHA <<<"$INFO"
     echo "    Release: $TAG"
     echo "    Archivo: $NOMBRE"
@@ -117,8 +127,8 @@ fi
 chmod u+x "$APPIMAGE"
 
 # ---------------------------------------------------------------- 3. arquitectura
-paso "3/6 Arquitectura del AppImage"
-command -v file >/dev/null && file -b "$APPIMAGE" | sed 's/^/    file: /'
+paso "3/7 Arquitectura del AppImage"
+if command -v file >/dev/null; then file -b "$APPIMAGE" | cut -c1-90 | sed 's/^/    file: /'; fi
 ARCH="$(python3 "$PY" arch "$APPIMAGE")"
 echo "    ELF: $ARCH"
 case "$ARCH" in
@@ -130,7 +140,7 @@ esac
 # ---------------------------------------------------------------- 4. extraer
 VERSION="$(basename "$APPIMAGE" .AppImage)"
 DEST="$BASE/$VERSION"
-paso "4/6 Extraer el AppImage en $DEST (evita depender de FUSE)"
+paso "4/7 Extraer el AppImage en $DEST (evita depender de FUSE)"
 if [ -e "$DEST/AppRun" ]; then
     ok "Ya estaba extraído"
 elif preguntar "Extraer"; then
@@ -157,11 +167,12 @@ else
 fi
 ln -sfn "$VERSION" "$BASE/actual"
 ok "actual -> $VERSION"
+[ -n "$YA" ] && [ "$YA" != "$VERSION" ] && echo "    (La versión anterior, $YA, se queda por si quieres volver: panel > Cambiar de versión)"
 python3 "$PY" "$DEST" | grep -E 'VEREDICTO|FALTAN|FEX:|no comprobadas' | head -15 | sed 's/^/    /' || true
 
 # ---------------------------------------------------------------- 5. lanzador
-paso "5/6 Lanzador: $APPS/lanzar_recomp.sh -> $DIR/lanzar_recomp.sh"
-chmod u+x "$DIR/lanzar_recomp.sh" "$DIR/diagnostico.sh" "$PY" 2>/dev/null || true
+paso "5/7 Lanzador: $APPS/lanzar_recomp.sh -> $DIR/lanzar_recomp.sh"
+chmod u+x "$DIR"/*.sh "$DIR"/herramientas/*.py 2>/dev/null || true
 if [ -e "$APPS/lanzar_recomp.sh" ] && [ ! -L "$APPS/lanzar_recomp.sh" ]; then
     mal "Ya existe un $APPS/lanzar_recomp.sh que no es un enlace: no lo toco."
 else
@@ -169,33 +180,63 @@ else
     ok "Hecho"
 fi
 
-# ---------------------------------------------------------------- 6. .desktop
-DESK="$HOME/.local/share/applications/recomplauncher-fex.desktop"
-paso "6/6 (Opcional) Acceso en el menú del escritorio: $DESK"
-if preguntar "Crear el acceso .desktop"; then
-    mkdir -p "$(dirname "$DESK")"
-    ICONO="$(ls "$BASE/actual"/*.png 2>/dev/null | head -1 || true)"
-    cat >"$DESK" <<EOF
+# ---------------------------------------------------------------- 6. arte para Steam
+ARTE="$BASE/arte-steam"
+paso "6/7 (Opcional) Imágenes oficiales para el acceso de Steam: $ARTE"
+if [ -f "$ARTE/poster.jpg" ] && [ -f "$ARTE/hero.jpg" ] && [ -f "$ARTE/logo.png" ] && [ -f "$ARTE/header.jpg" ]; then
+    ok "Ya están descargadas"
+elif preguntar "Descargar portada, fondo, logo y cabecera (≈1 MB)"; then
+    mkdir -p "$ARTE"
+    for f in poster.jpg hero.jpg logo.png header.jpg; do
+        curl -fsSL -o "$ARTE/$f" "$ARTE_URL/$f" && echo "    $f" || mal "No pude descargar $f"
+    done
+    ok "Ponlas tú en Steam: botón derecho en el acceso > Administrar > Personalizar arte (ver README)"
+else
+    echo "    Omitido."
+fi
+
+# ---------------------------------------------------------------- 7. .desktop
+paso "7/7 (Opcional) Accesos en el menú del escritorio (~/.local/share/applications)"
+D1="$HOME/.local/share/applications/recomplauncher-fex.desktop"
+D2="$HOME/.local/share/applications/konkr-store.desktop"
+if [ -f "$D1" ] && [ -f "$D2" ]; then
+    ok "Ya existen"
+elif preguntar "Crear los accesos «RecompLauncher (FEX)» y «Konkr Store»"; then
+    mkdir -p "$(dirname "$D1")"
+    ICONO="$ARTE/poster.jpg"; [ -f "$ICONO" ] || ICONO="applications-games"
+    cat >"$D1" <<EOF
 [Desktop Entry]
 Type=Application
 Name=RecompLauncher (FEX)
 Comment=RecompLauncher x86_64 ejecutado con FEX
 Exec=$APPS/lanzar_recomp.sh
 Path=$HOME
-Icon=${ICONO:-applications-games}
+Icon=$ICONO
 Categories=Game;
 Terminal=false
 EOF
-    ok "Creado"
+    cat >"$D2" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Konkr Store
+Comment=Panel: abrir, actualizar y revisar RecompLauncher y tus recomps
+Exec=$DIR/konkr_store.sh
+Path=$HOME
+Icon=system-software-install
+Categories=Game;Utility;
+Terminal=false
+EOF
+    ok "Creados"
 else
     echo "    Omitido."
 fi
 
 cat <<EOF
 
-$(printf '\033[1;32m')Instalación terminada.$(printf '\033[0m')
+$(printf '\033[1;32m')Instalación terminada: $VERSION$(printf '\033[0m')
 
-Prueba en Modo Escritorio:   $APPS/lanzar_recomp.sh
+Panel con botones grandes:   $DIR/konkr_store.sh
+Abrir RecompLauncher:        $APPS/lanzar_recomp.sh
 Registro:                    ~/recomp/logs/lanzar_recomp.log
 
 Para añadirlo a Steam (lo haces TÚ desde Steam; este script no toca Steam):

@@ -1,0 +1,17 @@
+{
+  "nota": "Aplicaciones destacadas de Flathub. La tienda comprueba si hay versión ARM64 antes de instalar; aparecer aquí no garantiza que exista.",
+  "destacadas": [
+    {"id": "org.mozilla.firefox",              "nombre": "Firefox",          "categoria": "Internet",     "desc": "Navegador web"},
+    {"id": "com.moonlight_stream.Moonlight",   "nombre": "Moonlight",        "categoria": "Juegos",       "desc": "Juega por streaming desde tu PC (NVIDIA GameStream / Sunshine)"},
+    {"id": "org.libretro.RetroArch",           "nombre": "RetroArch",        "categoria": "Emuladores",   "desc": "Emulador multisistema"},
+    {"id": "org.ppsspp.PPSSPP",                "nombre": "PPSSPP",           "categoria": "Emuladores",   "desc": "Emulador de PSP"},
+    {"id": "org.DolphinEmu.dolphin-emu",       "nombre": "Dolphin",          "categoria": "Emuladores",   "desc": "Emulador de GameCube y Wii"},
+    {"id": "io.mgba.mGBA",                     "nombre": "mGBA",             "categoria": "Emuladores",   "desc": "Emulador de Game Boy Advance"},
+    {"id": "net.kuribo64.melonDS",             "nombre": "melonDS",          "categoria": "Emuladores",   "desc": "Emulador de Nintendo DS"},
+    {"id": "org.flycast.Flycast",              "nombre": "Flycast",          "categoria": "Emuladores",   "desc": "Emulador de Dreamcast"},
+    {"id": "org.videolan.VLC",                 "nombre": "VLC",              "categoria": "Multimedia",   "desc": "Reproductor de vídeo y música"},
+    {"id": "tv.kodi.Kodi",                     "nombre": "Kodi",             "categoria": "Multimedia",   "desc": "Centro multimedia para TV y mando"},
+    {"id": "com.github.tchx84.Flatseal",       "nombre": "Flatseal",         "categoria": "Utilidades",   "desc": "Permisos de las aplicaciones Flatpak"},
+    {"id": "org.kde.dolphin",                  "nombre": "Dolphin (archivos)", "categoria": "Utilidades", "desc": "Explorador de archivos de KDE"}
+  ]
+}

@@ -1,58 +1,65 @@
 # Qué se ha probado y qué no
 
-Fecha: 2026-11-06. RecompLauncher revisado: código fuente `0.90.0-beta.19` (commit `e6a3165`).
+Última revisión: 2026-11-06. RecompLauncher revisado: código fuente `0.90.0-beta.19` (commit `e6a3165`).
 
-Las pruebas se hicieron en un contenedor Linux **x86_64** (no en la KONKR), con un usuario sin
-privilegios, un HOME aislado y un **FEX simulado** (un script que imita `--appimage-extract` y muestra
-con qué argumentos y variables se le llama).
+Todas las pruebas se hicieron en un contenedor Linux **x86_64** (no en la KONKR), con un usuario sin
+privilegios y un HOME aislado. FEX, Flatpak, Steam y su copia de seguridad fueron **simulados** con
+scripts que imitan lo justo y registran con qué se les llama.
 
 ## Probado ✅
 
-- `instalar.sh --si --appimage …` de principio a fin: crea solo las carpetas previstas en el HOME,
-  copia el AppImage, detecta x86_64, «extrae» (con el FEX simulado), crea el enlace `actual`, el enlace
-  `~/Applications/lanzar_recomp.sh` y el `.desktop`. Repetirlo no rompe nada.
-- `instalar.sh` se niega a ejecutarse como root.
-- `lanzar_recomp.sh`:
-  - Desde Steam/gamescope sin argumentos → añade `--bigpicture`, quita `LD_PRELOAD` y
-    `LD_LIBRARY_PATH`, pone `WEBKIT_DISABLE_DMABUF_RENDERER=1` y `GDK_BACKEND=x11`.
-  - Con su propia ruta como argumento (caso `%command%`) → la descarta.
-  - En escritorio → sin Big Picture; `RECOMP_ESCALA=2` → `GDK_SCALE=2`.
-  - Sin FEX → mensaje de error claro y código de salida 1.
-  - Rota el registro (`lanzar_recomp.log` → `.anterior`).
-- `diagnostico.sh`: se ejecuta sin errores y no escribe nada.
-- `revisar_binarios.py` (modo terminal): distingue bien un ELF **aarch64 real** (de un paquete
-  `manylinux_aarch64` de PyPI), un ELF x86_64, un `.exe` de Windows y un script; lee
-  `recomplauncher.json`; encuentra el rootfs de FEX en `~/.fex-emu/Config.json` y detecta las
-  librerías que faltan; calcula bien el offset de squashfs (= fin de la tabla de secciones ELF).
-- `shellcheck -S warning` sin avisos en los tres `.sh`.
+### Tienda (`konkr_store.py`), en una pantalla virtual de 1920×1080, solo con teclado
+- Pantalla de inicio con Aplicaciones, Recompilaciones y Herramientas; flechas, Intro y Esc.
+- **Aplicaciones**: destacadas con marca ✔ en las instaladas, detalle de la app; Instalar → comprobación
+  ARM64 (`flatpak remote-info --user`) → confirmación → `flatpak install --user` → «¿Añadir a Steam?» →
+  copia de seguridad → petición a Steam; «Abrir» sin instalar → aviso.
+- **Recompilaciones**: lee `library.json` de RecompLauncher; aviso de recomps nuevas sin acceso (una sola
+  vez); Sí → confirmación → acceso añadido y marcado con ★.
+- **Herramientas**: se muestra; «Cambiar de versión» cambia el enlace `actual` de forma atómica.
+- Diálogos **dentro de la ventana**: se encontraron y corrigieron dos fallos de foco (con diálogos de Tk el
+  teclado se iba a la ventana de detrás, y tras cerrar un diálogo no quedaba nada seleccionado).
+- Esc en el inicio → «¿Salir?» → Sí cierra.
+- Modo terminal: `estado`, `versiones`, `usar`, `graficos`, `recomps`, `acceso-recomp`, `acceso-app`,
+  `acceso-launcher`; rechaza `usar ../../etc` y ids como `x;rm`.
+
+### `herramientas/anadir_a_steam.sh`
+- Steam cerrado → se para (se corrigió un fallo: la comprobación se detectaba a sí misma como «Steam»).
+- Sin copia de seguridad → se para; copia que falla → se para; copia bien → pide a Steam.
+- Sin `steamos-add-to-steam`: crea `/tmp/addnonsteamgamefile` y llama a `steam steam://addnonsteamgame/<ruta codificada>`.
+- Con `steamos-add-to-steam`: lo usa.
+- Rechaza archivos fuera de tu carpeta personal o dentro de Steam; no duplica el registro.
+
+### Lanzador, instalador y actualizador
+- `lanzar_recomp.sh`: con un FEX simulado que falla al instante en modo normal → reintenta en modo seguro,
+  funciona y lo recuerda en `~/recomp/ajustes/graficos`; la segunda vez arranca directamente en seguro.
+- `instalar.sh --si --appimage …`: los 7 pasos, incluida la **descarga real del arte de Steam** (4 imágenes
+  válidas desde raw.githubusercontent.com) y los accesos «RecompLauncher (FEX)» y «Konkr Store».
+- `instalar.sh --comprobar` sin acceso a la API → código 2 y mensaje claro.
+- `actualizar.sh` contra un repo git local: sin cambios → `git pull` y se relanza con la versión nueva; con
+  cambios locales → no hace pull; con un archivo que se pisaría → git se niega y el script sigue.
+
+### Resto
+- `instalar.sh --si --appimage …` completo (versión anterior): carpetas, copia, arquitectura, extracción con
+  FEX simulado, enlaces, `.desktop`. Se niega a ejecutarse como root.
+- `releases.py`: la comparación de versiones acierta en 9 casos (betas, finales, `beta.3.1`, versiones
+  mayores) y la selección de AppImage prefiere ARM64.
+- `lanzar_recomp.sh` (versión anterior): Big Picture desde Steam, quita `LD_PRELOAD`, descarta su propia
+  ruta, escala, error sin FEX.
+- `revisar_binarios.py`: ELF aarch64 real, x86_64, `.exe`, scripts, `recomplauncher.json`, rootfs de FEX.
+- `desinstalar.sh`: manda a la papelera solo los grupos confirmados (la biblioteca se quedó al decir «n»).
+- `diagnostico.sh` sin errores; `shellcheck -S warning` sin avisos en todos los `.sh`.
 
 ## NO probado ❌ (no lo doy por hecho)
 
-- **Nada se ha ejecutado en la KONKR** ni con FEX real.
-- **No se ha descargado el AppImage real**: la red de esta sesión no llega a las descargas de GitHub
-  ni a recomplauncher.com. No he comprobado su arquitectura con `file` (por el código, la
-  configuración de Tauri y el nombre habitual `_amd64.AppImage`, casi seguro que es **x86_64**;
-  lo comprueba el paso 3 del instalador).
-- La descarga automática con la API de GitHub (`instalar.sh` sin `--appimage`) y la verificación
-  SHA-256 con el campo `digest`.
-- `FEXInterpreter RecompLauncher.AppImage --appimage-extract` con FEX real, y el método alternativo con
-  `unsquashfs` (no estaba instalado aquí).
-- Que WebKitGTK x86_64 dibuje bien bajo FEX en gamescope, la aceleración gráfica y el rendimiento.
-- Que el mando funcione dentro de RecompLauncher bajo FEX.
-- La ventana Tkinter de `revisar_binarios.py` (este contenedor no tiene Tkinter) y el modo zenity.
-- Instalar o jugar ninguna recomp concreta: no sé todavía qué recomps tienen build aarch64 ni qué
-  archivo exacto pide cada una (lo indica `revisar_binarios.py` tras instalarla, si trae
-  `recomplauncher.json`; también se ve en la ficha del juego en la app).
-- Recomps solo de Windows mediante Proton bajo FEX.
-
-## Hallazgos de la lectura del código de RecompLauncher
-
-- `shortcuts.rs`: «Add to Steam» escribe `shortcuts.vdf` y cierra y reabre Steam → no usarlo.
-- `proton.rs`: botón GE-Proton → escribe en `compatibilitytools.d` → no usarlo.
-- `assets.rs`: la arquitectura se fija al compilar (`arch_now`). Bajo FEX elige builds x64; compilado
-  ARM64, descartaría las builds marcadas x64.
-- `sysenv.rs`: desde Steam/gamescope ya activa `WEBKIT_DISABLE_DMABUF_RENDERER=1` y limpia el
-  runtime de Steam de `LD_LIBRARY_PATH`.
-- Argumento `--bigpicture`: abre directamente la vista para mando y TV.
-- Datos en `~/.local/share/com.recomplauncher.app` (o en `data/` junto al programa si hay un archivo
-  `portable`).
+- **Nada en la KONKR**, ni con FEX, Flatpak o Steam reales.
+- **Que Steam acepte `steam://addnonsteamgame`** en este port de SteamOS ARM, en el Modo Escritorio y en el
+  Modo Juego. Si no funciona, la tienda te dice qué archivo añadir a mano.
+- Que exista `steamos-add-to-steam` en este port.
+- Flathub real: la red de esta sesión no llega a flathub.org. No sé qué apps destacadas tienen versión ARM64
+  (la tienda lo comprueba antes de instalar).
+- Que el Python de SteamOS tenga Tkinter (lo dirá `diagnostico.sh`).
+- La tienda dentro de gamescope (Modo Juego) y con el mando real: el foco, la pantalla completa y la
+  asignación de botones de Steam Input.
+- Descargar el AppImage real de RecompLauncher (la red de esta sesión no llega a las descargas de GitHub) y
+  `instalar.sh --comprobar` contra la API real.
+- Las recomps en sí: ninguna instalada ni jugada.

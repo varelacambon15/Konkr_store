@@ -1,165 +1,178 @@
-# Konkr_store: RecompLauncher en la KONKR Pocket FIT
+# Konkr Store
 
-Scripts para usar [RecompLauncher](https://github.com/elripalda/RecompLauncher) (gestor de
-*recomps*: versiones nativas de PC de juegos de consola) en una **KONKR Pocket FIT**
-(Snapdragon 8 Gen 3, ARM64) con **SteamOS ARM** (port de hashtagbasit) y **FEX**, y abrirlo desde
-Steam como «juego que no es de Steam», con el mando y en Big Picture.
+Tienda y panel para la **KONKR Pocket FIT** (Snapdragon 8 Gen 3, ARM64) con **SteamOS ARM** (port de
+hashtagbasit) y **FEX**. Se maneja con el mando o el teclado, y lo que instales se puede añadir a Steam
+para abrirlo desde el Modo Juego / Big Picture como «juego que no es de Steam».
 
-> RecompLauncher no incluye juegos ni los descarga. Cada recomp necesita **tu propia copia** del
-> juego (tu disco o tu copia de seguridad).
+Al abrirla aparecen tres secciones:
 
-## Qué hace y qué no
-
-| Hace | No hace |
+| Sección | Qué hace |
 |---|---|
-| Descarga el AppImage oficial de RecompLauncher desde GitHub y comprueba su SHA-256 | No usa `sudo`, `pacman` ni toca el sistema |
-| Lo extrae en `~/Applications/RecompLauncher` (sin FUSE) | No escribe nada en Steam (ni `shortcuts.vdf`, ni `config.vdf`, ni carpetas de juegos) |
-| Crea `~/Applications/lanzar_recomp.sh`, que lo ejecuta con FEX | No borra nada |
-| (Opcional) Crea un acceso en `~/.local/share/applications` | No descarga juegos |
+| **Aplicaciones** | Tipo Discover: aplicaciones **Flatpak de Flathub** (destacadas, búsqueda, instaladas, actualizar todas). Instala siempre **en tu usuario** (`flatpak --user`), sin sudo. Antes de instalar comprueba que la app exista para ARM64. |
+| **Recompilaciones** | Las recomps instaladas con [RecompLauncher](https://github.com/elripalda/RecompLauncher): **Jugar**, **Añadir a Steam**, **Revisar binarios** (aarch64 o x86_64, qué librerías faltan) y **Descargar recomps** (abre RecompLauncher). Avisa de las recomps nuevas que aún no tengan acceso en Steam. |
+| **Herramientas** | Buscar actualizaciones, actualizar todo, cambiar de versión de RecompLauncher, modo gráfico, añadir RecompLauncher a Steam, copia de seguridad de Steam, diagnóstico, ver registro, guardar la salida. |
 
-## Instalación (copiar y pegar en Konsole, en Modo Escritorio)
+> RecompLauncher no incluye juegos ni los descarga: cada recomp necesita **tu propia copia** del juego.
 
-1) Descargar este repositorio (solo crea `~/Konkr_store`):
+## Instalación en un solo comando (Konsole, en Modo Escritorio)
 
 ```bash
-git clone https://github.com/varelacambon15/Konkr_store.git ~/Konkr_store
+git clone https://github.com/varelacambon15/Konkr_store.git ~/Konkr_store && ~/Konkr_store/instalar.sh
 ```
 
-2) Diagnóstico de **solo lectura** (FEX, rootfs, herramientas de Steam, etc.). Si algo sale raro,
-pásame la salida:
+El instalador pregunta antes de cada paso (responde `s`). Todo va a tu carpeta de usuario y **no toca Steam**.
+
+Si quieres ver antes cómo está la consola (solo lectura, no cambia nada):
 
 ```bash
 ~/Konkr_store/diagnostico.sh
 ```
 
-3) Instalar (pregunta antes de cada paso; responde `s` para seguir):
+## Abrir la tienda
 
 ```bash
-~/Konkr_store/instalar.sh
+~/Konkr_store/konkr_store.sh
 ```
 
-Si la descarga desde GitHub falla, baja tú el `.AppImage` desde
-<https://github.com/elripalda/RecompLauncher/releases> y pásaselo:
+También aparece en el menú del escritorio como **Konkr Store**, si aceptaste crear los accesos.
+
+**Controles:** flechas o cruceta para moverse · Intro / A para elegir · Esc / B para volver · Steam + X para
+el teclado en pantalla. Los avisos y confirmaciones salen dentro de la propia ventana, con botones grandes.
+
+## Añadir cosas a Steam (cómo funciona y por qué es seguro)
+
+Cuando instalas una app o una recomp, la tienda pregunta si quieres añadirla a Steam. Si dices que sí:
+
+1. Ejecuta tu copia de seguridad `~/iw6x-steamos/tools/respaldo_steam.sh`. Si falla o no existe, se para
+   (y te avisa).
+2. Prepara un acceso `.desktop` en `~/recomp/accesos/`. Para las apps Flatpak usa el `.desktop` que el
+   propio Flatpak instala, igual que Discover.
+3. **Se lo pide a Steam**: usa `steamos-add-to-steam` si existe, o si no el enlace
+   `steam://addnonsteamgame/…`. Es el mismo mecanismo que el botón «Add to Steam» de Discover.
+   **Steam añade el acceso él mismo**, sin cerrarse. La tienda **nunca escribe** `shortcuts.vdf` ni ningún
+   archivo de Steam.
+
+Steam tiene que estar abierto. Si en unos segundos no aparece el acceso, la tienda te dice qué archivo añadir
+a mano (Steam → Añadir un juego que no es de Steam → Explorar).
+
+Las recomps se añaden como `lanzar_recomp.sh --play <id>`: Steam abre directamente esa recomp, a través de
+RecompLauncher (que se encarga del tiempo de juego y las copias de partidas).
+
+### Añadir la tienda y RecompLauncher a Steam
+
+- **RecompLauncher**: Tienda → Herramientas → «Añadir RecompLauncher a Steam».
+- **La propia tienda**: en Steam (Modo Escritorio), «Añadir un juego que no es de Steam» → Explorar →
+  `/home/steamos/Konkr_store/konkr_store.sh`. En Compatibilidad, no fuerces ninguna herramienta.
+
+Si prefieres hacerlo a mano para RecompLauncher:
+
+- **Destino**: `"/home/steamos/Applications/lanzar_recomp.sh"`
+- **Iniciar en**: `"/home/steamos"`
+- **Opciones de lanzamiento**:
+
+  ```
+  --bigpicture
+  ```
+
+- **Compatibilidad**: sin forzar ninguna herramienta (ni Proton ni otra).
+
+### Arte para Steam
+
+El instalador puede descargar las imágenes oficiales de RecompLauncher a
+`~/Applications/RecompLauncher/arte-steam/` (`poster.jpg`, `hero.jpg`, `logo.png`, `header.jpg`). Para
+ponerlas: botón derecho en el acceso → Administrar → Personalizar arte. La tienda no toca la carpeta de arte
+de Steam.
+
+## Actualizar
+
+Desde la tienda (Herramientas → Actualizar todo), o:
 
 ```bash
-~/Konkr_store/instalar.sh --appimage ~/Downloads/RecompLauncher_0.90.0-beta.19_amd64.AppImage
+~/Konkr_store/actualizar.sh
 ```
 
-4) Probarlo en el escritorio antes de meterlo en Steam:
+Hace `git pull` de los scripts y, si hay versión nueva de RecompLauncher, la instala en su propia carpeta.
+Las anteriores se quedan; puedes volver a una con Herramientas → «Cambiar de versión».
+
+Para ver solo si hay versión nueva, sin cambiar nada:
 
 ```bash
-~/Applications/lanzar_recomp.sh
+~/Konkr_store/instalar.sh --comprobar
 ```
 
-El registro queda en `~/recomp/logs/lanzar_recomp.log` (y el anterior, en `lanzar_recomp.log.anterior`).
+## Si RecompLauncher sale en negro o se cierra al arrancar
 
-## Añadirlo a Steam («juego que no es de Steam»)
+El lanzador lo detecta solo: si se cierra con error en menos de 20 segundos, lo reintenta en **modo gráfico
+seguro** y, si así funciona, lo recuerda (`~/recomp/ajustes/graficos`). Puedes cambiarlo en Herramientas →
+«Modo gráfico: cambiar». El registro está en Herramientas → «Ver registro»
+(`~/recomp/logs/lanzar_recomp.log`).
 
-Esto lo haces **tú** desde Steam; los scripts no tocan Steam. Steam escribirá el acceso en su
-`shortcuts.vdf` por sí mismo, así que primero haz la copia de seguridad:
+Variables para las opciones de lanzamiento de Steam (con variables delante hace falta `%command%`):
 
-```bash
-~/iw6x-steamos/tools/respaldo_steam.sh
-```
-
-Después, en **Modo Escritorio**:
-
-1. Steam → **Juegos** → **Añadir un juego que no es de Steam a mi biblioteca…** → **Explorar…** →
-   elige `/home/steamos/Applications/lanzar_recomp.sh` → **Añadir programas seleccionados**.
-2. Botón derecho sobre el acceso → **Propiedades**:
-   - **Destino**: `"/home/steamos/Applications/lanzar_recomp.sh"`
-   - **Iniciar en**: `"/home/steamos"`
-   - **Opciones de lanzamiento**, pega:
-
-     ```
-     --bigpicture
-     ```
-
-   - **Compatibilidad**: deja **desmarcado** «Forzar el uso de una herramienta de compatibilidad»
-     (ni Proton ni ninguna otra). El script ya llama a FEX.
-3. Opcional: cámbiale el nombre a `RecompLauncher`.
-
-¿Por qué no `lanzar_recomp.sh %command%`? En un juego que no es de Steam, el destino *ya es* el
-script, y `%command%` se sustituye por el destino. Pegarlo así haría que el script recibiera su
-propia ruta como argumento. El script lo tolera (la descarta), pero no hace falta.
-
-Variables opcionales, delante de `--bigpicture` en las opciones de lanzamiento:
-
-| Si ves… | Pega en Opciones de lanzamiento |
+| Si quieres… | Opciones de lanzamiento |
 |---|---|
-| Ventana en negro | `RECOMP_GRAFICOS=seguro %command% --bigpicture` |
-| Interfaz demasiado pequeña | `RECOMP_ESCALA=2 %command% --bigpicture` |
-| Quieres la vista normal, no Big Picture | `RECOMP_ESCRITORIO=1 %command%` |
+| Forzar el modo gráfico seguro | `RECOMP_GRAFICOS=seguro %command% --bigpicture` |
+| Ignorar el modo seguro recordado | `RECOMP_GRAFICOS=normal %command% --bigpicture` |
+| Interfaz más grande | `RECOMP_ESCALA=2 %command% --bigpicture` |
 
-(Con variables delante sí hace falta `%command%`: así Steam las aplica al lanzar el destino.)
+## Dentro de RecompLauncher: qué NO usar
 
-## Dentro de RecompLauncher: qué NO usar en esta consola
+Revisé su código fuente (0.90.0-beta.19):
 
-Revisé el código fuente de RecompLauncher 0.90.0-beta.19 y estas funciones chocan con las reglas
-de seguridad de esta consola:
+- **«Add to Steam» de RecompLauncher**: escribe `shortcuts.vdf` directamente y cierra y reabre Steam.
+  **No lo uses**: añade las recomps desde la tienda (Recompilaciones → Añadir a Steam).
+- **Botón GE-Proton**: descarga Proton x86_64 en `compatibilitytools.d` de Steam. **No lo uses.**
+- **Recomps solo de Windows**: necesitarían Proton bajo FEX. **No probado.**
+- **Carpeta de la biblioteca**: elige `~/recomp/biblioteca`, nunca una carpeta dentro de `steamapps`.
 
-- **«Add to Steam»** (en la app y en cada juego): escribe directamente en
-  `userdata/*/config/shortcuts.vdf` y cierra y reabre Steam (`shortcuts.rs`). **No lo uses.**
-  Añade los juegos tú a mano, como arriba.
-- **Botón GE-Proton** (Ajustes → General): descarga GE-Proton x86_64 en
-  `~/.local/share/Steam/compatibilitytools.d`. **No lo uses.**
-- **Winetricks / recomps solo de Windows**: necesitarían Proton bajo FEX. **No probado**; evítalo
-  y usa las versiones de Linux.
-- **Carpeta de la biblioteca**: en el asistente inicial elige `~/recomp/biblioteca`. **Nunca**
-  una carpeta dentro de `steamapps`.
+## Cómo se ejecutan las recomps
 
-## Cómo se ejecutan las recomps aquí
-
-- RecompLauncher se compila para x86_64, así que bajo FEX se ve a sí mismo como «x64» y **elige
-  las builds de Linux x86_64** de cada recomp. Esas deberían ejecutarse también con FEX, porque FEX
-  emula los procesos hijos x86_64 (sin probar todavía en esta consola).
-- Una recomp es **nativa** solo si su proyecto publica un binario `aarch64`/`arm64`. El launcher,
-  bajo FEX, no lo elegirá solo: tendrías que instalarlo a mano.
-- Para saber qué trae una recomp instalada (aarch64 o x86_64, qué librerías le faltan y qué
-  archivo del juego pide según su `recomplauncher.json`):
+RecompLauncher es x86_64 y corre con FEX, así que elige las builds de Linux x86_64 de cada recomp, que
+deberían correr también con FEX (sin probar todavía en esta consola). Una recomp solo es nativa si su
+proyecto publica un binario `aarch64`. Para comprobar qué trae una: Recompilaciones → «Revisar binarios»,
+o la ventana
 
 ```bash
 ~/Konkr_store/herramientas/revisar_binarios.py
 ```
 
-  Abre una ventana para elegir la carpeta. Sin Tkinter usa zenity, y si no, la terminal:
+## Desinstalar
 
 ```bash
-~/Konkr_store/herramientas/revisar_binarios.py ~/recomp/biblioteca/NOMBRE_DE_LA_RECOMP
+~/Konkr_store/desinstalar.sh
 ```
 
-  Solo lee. Guarda un informe únicamente si pulsas «Guardar informe» (en `~/recomp/informes`).
+Pregunta por cada grupo y **mueve a la papelera** (no borra). Tus recomps y los datos de RecompLauncher
+(copias de partidas incluidas) solo se quitan si lo confirmas expresamente. Los accesos de Steam se quitan
+desde Steam.
 
-## Actualizar
-
-```bash
-git -C ~/Konkr_store pull && ~/Konkr_store/instalar.sh
-```
-
-Cada versión nueva se extrae en su propia carpeta y `~/Applications/RecompLauncher/actual` pasa a
-apuntar a ella; las anteriores se quedan por si hay que volver atrás.
-
-## Desinstalar (a mano, tú decides qué borrar)
-
-- `~/Applications/RecompLauncher/` y `~/Applications/lanzar_recomp.sh`
-- `~/.local/share/applications/recomplauncher-fex.desktop`
-- Datos de la app: `~/.local/share/com.recomplauncher.app/`
-- Tus recomps: `~/recomp/`
-- El acceso en Steam: bórralo desde Steam (botón derecho → Administrar → Eliminar de la biblioteca)
-
-## Dónde guarda cosas
+## Dónde está cada cosa
 
 | Qué | Dónde |
 |---|---|
-| Programa | `~/Applications/RecompLauncher/<versión>/` |
-| Configuración, biblioteca, copias de partidas | `~/.local/share/com.recomplauncher.app/` |
-| Recomps instaladas | La carpeta que elijas (recomendado `~/recomp/biblioteca`) |
-| Registros de este repo | `~/recomp/logs/` |
+| RecompLauncher (cada versión en su carpeta) | `~/Applications/RecompLauncher/` |
+| Lanzador | `~/Applications/lanzar_recomp.sh` |
+| Datos de RecompLauncher | `~/.local/share/com.recomplauncher.app/` |
+| Recomps | `~/recomp/biblioteca/` (la eliges en RecompLauncher) |
+| Accesos preparados para Steam y registro de los añadidos | `~/recomp/accesos/` |
+| Registros | `~/recomp/logs/` |
+| Ajustes (modo gráfico) | `~/recomp/ajustes/` |
+| Informes guardados | `~/recomp/informes/` |
+| Apps Flatpak de usuario | `~/.local/share/flatpak/` |
 
-## Idea futura: RecompLauncher nativo ARM64
+## Archivos del repositorio
 
-RecompLauncher es una app Tauri (Rust + WebKitGTK) con el código fuente público, así que se puede
-compilar para ARM64 (por ejemplo, con GitHub Actions en un runner ARM). La diferencia importante
-es que, compilado nativo, **solo ofrecería las recomps que publican build ARM64**, porque descarta
-las x86_64 (`assets.rs`, `other_arch`). Con FEX ves todas las de Linux x86_64. Se puede tener
-cada versión en una carpeta distinta. Ver [PROBADO.md](PROBADO.md).
+| Archivo | Para qué |
+|---|---|
+| `instalar.sh` | Instala o actualiza RecompLauncher (`--si`, `--appimage RUTA`, `--comprobar`) |
+| `konkr_store.sh` / `konkr_store.py` | La tienda (ventana). `konkr_store.py estado` muestra el estado en la terminal |
+| `lanzar_recomp.sh` | Abre RecompLauncher con FEX (lo usan Steam y la tienda) |
+| `actualizar.sh` | `git pull` + versión nueva de RecompLauncher |
+| `diagnostico.sh` | Diagnóstico de solo lectura |
+| `desinstalar.sh` | Desinstalación a la papelera |
+| `herramientas/anadir_a_steam.sh` | Pide a Steam que añada un acceso (copia de seguridad antes) |
+| `herramientas/revisar_binarios.py` | Revisa la arquitectura y las librerías de una recomp |
+| `herramientas/releases.py` | Consulta las versiones de RecompLauncher en GitHub |
+| `datos/aplicaciones.json` | Lista de aplicaciones destacadas (edítala a tu gusto) |
+
+Qué se ha probado y qué no: [PROBADO.md](PROBADO.md).
