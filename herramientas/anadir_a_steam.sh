@@ -5,7 +5,7 @@
 #   anadir_a_steam.sh ARCHIVO.desktop|ARCHIVO.sh [--sin-respaldo]
 #
 # Antes ejecuta tu copia de seguridad (~/iw6x-steamos/tools/respaldo_steam.sh). Si no existe, se para
-# (salvo con --sin-respaldo). Steam tiene que estar abierto.
+# (salvo con --sin-respaldo). Steam tiene que estar abierto. KONKR_RESPALDO_HECHO=1: la copia ya se hizo para esta tanda (konkr_store.py auto-steam).
 # Salida: 0 pedido a Steam · 2 archivo no válido · 3 Steam no está abierto · 4 falló la copia · 5 no hay copia
 set -u
 RESPALDO="${KONKR_RESPALDO:-$HOME/iw6x-steamos/tools/respaldo_steam.sh}"
@@ -31,7 +31,9 @@ if ! pgrep -x steam >/dev/null 2>&1 && ! pgrep -x steamwebhelper >/dev/null 2>&1
     echo "Steam no está abierto: ábrelo y vuelve a intentarlo."; exit 3
 fi
 
-if [ -f "$RESPALDO" ]; then
+if [ "${KONKR_RESPALDO_HECHO:-}" = 1 ]; then
+    echo "Copia de seguridad de Steam: ya hecha en esta tanda"
+elif [ -f "$RESPALDO" ]; then
     echo "Copia de seguridad de Steam: $RESPALDO"
     bash "$RESPALDO" || { echo "La copia de seguridad falló: no sigo."; exit 4; }
 elif [ "$sin_respaldo" = 0 ]; then

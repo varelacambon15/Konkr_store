@@ -39,6 +39,36 @@ También aparece en el menú del escritorio como **Konkr Store**, si aceptaste c
 **Controles:** flechas o cruceta para moverse · Intro / A para elegir · Esc / B para volver · Steam + X para
 el teclado en pantalla. Los avisos y confirmaciones salen dentro de la propia ventana, con botones grandes.
 
+## Recomps en Steam: automático, y sin Proton
+
+**Se añaden solas.** Al cerrar RecompLauncher (y al entrar en Recompilaciones), las recomps instaladas que aún no
+tienen acceso en Steam se añaden automáticamente: primero tu copia de seguridad de Steam (una por tanda; si falla,
+no se añade nada) y luego se le pide a Steam por la vía segura (`steam://addnonsteamgame`). Steam cerrado: quedan
+pendientes para la próxima vez. Se desactiva en Herramientas → «Recomps a Steam: auto sí/no». Registro:
+`~/recomp/logs/auto_steam.log`.
+
+**Linux o Windows.** Cada recomp muestra qué build tiene instalada:
+
+| Etiqueta | Qué es | Cómo se abre |
+|---|---|---|
+| `[Linux ARM64]` | Binario aarch64 | Nativo: sin FEX ni Proton |
+| `[Linux x86·FEX]` | Binario Linux x86_64 | Con FEX, sin Proton |
+| `[Windows·Proton]` | `.exe` | RecompLauncher con su propio Proton (no probado en ARM) |
+| `[¿?]` | No se sabe qué programa es | RecompLauncher decide |
+
+El acceso de Steam de cada recomp es un script de Linux (`herramientas/jugar_recomp.py <id>`), así que **en Steam
+ninguna necesita Proton**: en Propiedades → Compatibilidad, deja sin marcar «Forzar herramienta de compatibilidad».
+
+Por defecto el script la abre **a través de RecompLauncher** (`--play`), que la prepara como siempre (tu copia del
+juego, sus ajustes y argumentos, efectos, partidas en la nube). Para las de Linux hay un **modo directo** opcional
+(Recompilaciones → «Directo / Launcher»): se salta RecompLauncher, gasta menos memoria y, en las ARM64, conserva el
+overlay de Steam. Úsalo después de haberla jugado una vez con RecompLauncher. Cambiar de modo no obliga a volver a
+añadirla a Steam: el script decide al arrancar. Para ver qué haría con una recomp:
+
+```bash
+~/Konkr_store/herramientas/jugar_recomp.py ID --info
+```
+
 ## Comparar nativo ARM64 contra x86_64 + FEX
 
 En Recompilaciones → **«Comparar ARM vs FEX»**. Por ahora está configurada **Zelda 64: Recompiled**, que
@@ -206,6 +236,7 @@ desde Steam.
 | `herramientas/revisar_binarios.py` | Revisa la arquitectura y las librerías de una recomp |
 | `herramientas/releases.py` | Consulta las versiones de RecompLauncher en GitHub |
 | `datos/aplicaciones.json` | Lista de aplicaciones destacadas (edítala a tu gusto) |
+| `herramientas/jugar_recomp.py` | Abre una recomp (vía RecompLauncher o directa; lo usan sus accesos de Steam) |
 | `herramientas/comparar_recomp.py` | Descarga y prepara las builds ARM64 y x86_64 de una recomp para compararlas |
 | `herramientas/medir_y_lanzar.sh` | Lanza una build (nativa o con FEX) midiendo batería, temperatura y CPU |
 | `datos/comparar.json` | Recomps disponibles para comparar |

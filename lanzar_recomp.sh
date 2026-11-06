@@ -8,6 +8,7 @@
 #   RECOMP_GRAFICOS=normal   ignora el modo seguro recordado (~/recomp/ajustes/graficos)
 #   RECOMP_ESCALA=2          escala la interfaz GTK x2
 #   RECOMP_ESCRITORIO=1      no fuerza Big Picture
+# Al cerrarse, añade a Steam las recomps nuevas (konkr_store.py auto-steam; ~/recomp/logs/auto_steam.log).
 set -u
 
 # Steam mete en LD_PRELOAD/LD_LIBRARY_PATH librerías ARM64 (overlay, runtime) que un programa
@@ -15,6 +16,7 @@ set -u
 unset LD_PRELOAD LD_LIBRARY_PATH
 
 
+TIENDA="$(dirname "$(readlink -f "$0")")/konkr_store.py"   # antes de cualquier cd: $0 puede ser relativo
 BASE="${RECOMP_BASE:-$HOME/Applications/RecompLauncher}"
 APPDIR="$BASE/actual"
 LOGDIR="$HOME/recomp/logs"
@@ -102,5 +104,10 @@ if [ "$codigo" != 0 ] && [ "$dura" -lt 20 ] && [ "$modo" != "seguro" ] && [ -z "
 fi
 if [ "$codigo" != 0 ] && [ "$dura" -lt 20 ]; then
     aviso "RecompLauncher se cerró al arrancar (código $codigo). Mira el registro: $LOG"
+fi
+# Recomps instaladas en esta sesión: a Steam automáticamente (Konkr Store > Herramientas lo activa o desactiva), con copia de
+# seguridad antes y pidiéndoselo a Steam. En segundo plano y separado de Steam, para no retrasar ni depender de esta ventana
+if [ -f "$TIENDA" ] && [ "$(cat "$HOME/recomp/ajustes/auto_steam" 2>/dev/null)" != "no" ]; then
+    setsid python3 "$TIENDA" auto-steam >>"$LOGDIR/auto_steam.log" 2>&1 </dev/null &
 fi
 exit "$codigo"

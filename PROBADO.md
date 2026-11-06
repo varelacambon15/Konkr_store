@@ -38,6 +38,20 @@ scripts que imitan lo justo y registran con qué se les llama.
 - `actualizar.sh` contra un repo git local: sin cambios → `git pull` y se relanza con la versión nueva; con
   cambios locales → no hace pull; con un archivo que se pisaría → git se niega y el script sigue.
 
+### Recomps a Steam automáticamente y Linux/Windows
+- `jugar_recomp.py` con un `library.json` simulado de 4 recomps (aarch64 real, x86_64 real con `recomplauncher.json`,
+  Windows con `proton: true`, sin ejecutable): las clasifica bien; vía RecompLauncher por defecto (`--play id`);
+  directo x86_64 → FEX con la carpeta del ejecutable (la misma que usa RecompLauncher), argumentos del manifiesto,
+  `{install}` sustituido, `RECOMPLAUNCHER_*` sin pasar, sin `LD_PRELOAD` ni el `LD_LIBRARY_PATH` de Steam; el modo
+  directo no se permite en Windows.
+- `konkr_store.py auto-steam`: Steam cerrado → pendientes; abierto → una copia de seguridad y una petición por recomp;
+  la segunda vez, nada; desactivado → no hace nada.
+- `lanzar_recomp.sh`: al cerrarse RecompLauncher lanza la tanda en segundo plano (se corrigió un fallo: con una ruta
+  relativa no encontraba la tienda tras su `cd`).
+- En la tienda (pantalla virtual): etiquetas por recomp y tanda automática al entrar.
+- No probado: que Steam de este port acepte las peticiones; el modo directo con una recomp real (RecompLauncher puede
+  necesitar preparar algo que el modo directo no hace: por eso es opcional).
+
 ### Comparar ARM64 vs FEX
 - Comprobado en el repositorio de Zelda 64: Recompiled (commit `b65c482`, 25-09-2026): su CI compila
   **Linux ARM64** (Ubuntu 22.04) y x86_64. Su README: «ARM64 builds will work on any ARM64 CPU».

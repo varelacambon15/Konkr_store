@@ -14,6 +14,7 @@ Mando / teclado: flechas para moverse, Intro para elegir, Esc para volver.
 Uso en terminal (sin ventana):
   konkr_store.py estado | versiones | usar VERSION | graficos seguro|normal
   konkr_store.py recomps | acceso-recomp ID | acceso-app ID | acceso-launcher
+  konkr_store.py auto-steam [--forzar]   añade a Steam las recomps nuevas (copia de seguridad antes)
 """
 import json
 import os
@@ -37,6 +38,8 @@ LOG_LANZ = RECOMP / "logs/lanzar_recomp.log"
 LIBRERIA = Path(os.environ.get("XDG_DATA_HOME", HOME / ".local/share")) / "com.recomplauncher.app/library.json"
 RESPALDO = Path(os.environ.get("KONKR_RESPALDO", HOME / "iw6x-steamos/tools/respaldo_steam.sh"))
 ANADIR = DIR / "herramientas/anadir_a_steam.sh"
+JUGAR = DIR / "herramientas/jugar_recomp.py"
+MODO_RECOMP = RECOMP / "ajustes/lanzamiento"
 FLATHUB_REPO = "https://dl.flathub.org/repo/flathub.flatpakrepo"
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 ID_VALIDO = re.compile(r"^[A-Za-z0-9_.\-]+$")
@@ -108,11 +111,112 @@ def recomps():
     return sorted(out, key=lambda x: x["nombre"].lower())
 
 
+TIPOS = {"linux-arm64": "Linux ARM64", "linux-x64": "Linux x86·FEX", "windows": "Windows·Proton", "?": "¿?"}
+
+
+def _jugar():
+    sys.path.insert(0, str(DIR / "herramientas"))
+    import jugar_recomp
+    return jugar_recomp
+
+
+def tipo_recomp(gid):
+    """(modo, etiqueta corta, explicación): qué build es y cómo la abrirá su acceso (herramientas/jugar_recomp.py)."""
+    j = _jugar()
+    modo, _p, _a, _c, _e, expl = j.plan(gid)
+    g = j.leer(gid)
+    tipo = j.build_de(g)[0] if g else "?"
+    etq = TIPOS[tipo] + (" · directo" if modo != "launcher" else "")
+    return modo, etq, expl
+
+
+def cambiar_modo_recomp(gid):
+    """Alterna entre «vía RecompLauncher» (por defecto) y «directo» (solo builds de Linux). Devuelve tipo_recomp, o None si no se puede."""
+    j = _jugar()
+    g = j.leer(gid)
+    if not g or j.build_de(g)[0] not in ("linux-arm64", "linux-x64"):
+        return None
+    f = MODO_RECOMP / gid
+    if f.exists():
+        f.unlink()
+    else:
+        MODO_RECOMP.mkdir(parents=True, exist_ok=True)
+        f.write_text("directo\n")
+    return tipo_recomp(gid)
+
+
 def anadidos():
     try:
         return set((ACCESOS / "anadidos.txt").read_text().split("\n")) - {""}
     except OSError:
         return set()
+
+
+AUTO_STEAM = RECOMP / "ajustes/auto_steam"
+
+
+def auto_activo():
+    try:
+        return AUTO_STEAM.read_text().strip() != "no"
+    except OSError:
+        return True                      # activado salvo que se desactive en Herramientas
+
+
+def poner_auto(on):
+    AUTO_STEAM.parent.mkdir(parents=True, exist_ok=True)
+    AUTO_STEAM.write_text("si\n" if on else "no\n")
+
+
+def recomps_pendientes():
+    ya = anadidos()
+    return [g for g in recomps() if str(ACCESOS / f"{nombre_archivo('recomp-' + g['id'])}.desktop") not in ya]
+
+
+def steam_abierto():
+    return any(sh(["pgrep", "-x", n])[0] == 0 for n in ("steam", "steamwebhelper"))
+
+
+def auto_steam(decir=print):
+    """Añade a Steam las recomps instaladas que aún no tienen acceso: una copia de seguridad por tanda y luego
+    una petición a Steam por recomp (herramientas/anadir_a_steam.sh). Devuelve 0 hecho/nada que hacer,
+    3 Steam cerrado (quedan pendientes), 4 falló la copia, 5 no hay copia de seguridad, 6 ya hay otra tanda en marcha."""
+    import fcntl
+    pend = recomps_pendientes()
+    if not pend:
+        decir("No hay recomps nuevas sin acceso en Steam.")
+        return 0
+    decir(f"Recomps nuevas sin acceso en Steam: {', '.join(g['nombre'] for g in pend)}")
+    if not steam_abierto():
+        decir("Steam no está abierto: se añadirán la próxima vez.")
+        return 3
+    if not RESPALDO.is_file():
+        decir(f"No encuentro {RESPALDO}: sin copia de seguridad no se añade nada automáticamente.")
+        return 5
+    ACCESOS.mkdir(parents=True, exist_ok=True)
+    cerrojo = open(ACCESOS / ".auto.lock", "w")
+    try:
+        fcntl.flock(cerrojo, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        decir("Ya hay otra tanda añadiendo recomps.")
+        return 6
+    decir(f"Copia de seguridad de Steam: {RESPALDO}")
+    c, out = sh(["bash", str(RESPALDO)], timeout=600)
+    if out:
+        decir(out)
+    if c != 0:
+        decir("La copia de seguridad falló: no se añade nada.")
+        return 4
+    entorno = dict(os.environ, KONKR_RESPALDO_HECHO="1")
+    for g in pend:
+        try:
+            acc = acceso_recomp(g["id"])
+        except ValueError as e:
+            decir(f"{g['nombre']}: {e}")
+            continue
+        r = subprocess.run(["bash", str(ANADIR), str(acc)], capture_output=True, text=True, env=entorno)
+        decir(f"{g['nombre']}: {'pedido a Steam' if r.returncode == 0 else 'no se pudo (' + (r.stdout + r.stderr).strip().splitlines()[-1] + ')'}")
+        time.sleep(1.5)                  # una petición tras otra, sin amontonarlas en Steam
+    return 0
 
 
 def nombre_archivo(texto):
@@ -136,7 +240,8 @@ def acceso_recomp(gid):
     g = next((r for r in recomps() if r["id"] == gid), None)
     if not g:
         raise ValueError(f"No encuentro la recomp {gid} en {LIBRERIA}")
-    return escribir_desktop(f"recomp-{gid}", g["nombre"], f'"{LANZADOR}" --play {gid}')
+    # Siempre el mismo lanzador: decide al arrancar (nativa, FEX o RecompLauncher), así el acceso de Steam no cambia
+    return escribir_desktop(f"recomp-{gid}", g["nombre"], f'"{JUGAR}" {gid}')
 
 
 def acceso_launcher():
@@ -703,14 +808,21 @@ def interfaz():
         lb_rec.delete(0, "end")
         for g in rec_vista:
             en_steam = str(ACCESOS / f"{nombre_archivo('recomp-' + g['id'])}.desktop") in ya
-            lb_rec.insert("end", f"{'★ ' if en_steam else '   '}{g['nombre']}   {g['version']}")
+            etq = tipo_recomp(g["id"])[1]
+            lb_rec.insert("end", f"{'★ ' if en_steam else '   '}{g['nombre']}   {g['version']}   [{etq}]")
         if rec_vista:
             lb_rec.selection_set(0)
             lb_rec.activate(0)
-            escribir(sal_rec, f"{len(rec_vista)} recomps instaladas (★ = ya pedida a Steam)\n", limpiar=limpiar)
+            escribir(sal_rec, f"{len(rec_vista)} recomps instaladas (★ = ya pedida a Steam). Las de Linux se abren sin Proton; "
+                              "las [Windows·Proton] usan el Proton de RecompLauncher. En Steam ninguna necesita Proton.\n", limpiar=limpiar)
         else:
             escribir(sal_rec, "Aún no hay recomps. Pulsa «Descargar recomps» para abrir RecompLauncher.\n"
                               f"(Se leen de {LIBRERIA})\n", limpiar=True)
+        if avisar and auto_activo():
+            if recomps_pendientes() and not ocupado["v"]:
+                tarea(sal_rec, "Añadir recomps nuevas a Steam (automático)",
+                      [sys.executable, str(DIR / "konkr_store.py"), "auto-steam"], lambda c: pintar_recomps(limpiar=False))
+            return
         if avisar:
             nuevas = [g for g in rec_vista
                       if str(ACCESOS / f"{nombre_archivo('recomp-' + g['id'])}.desktop") not in ya
@@ -741,8 +853,28 @@ def interfaz():
 
     def jugar():
         g = rec_sel()
-        if g and hay_launcher():
-            lanzar([str(LANZADOR), "--play", g["id"]], sal_rec, g["nombre"])
+        if g:
+            modo, etq, expl = tipo_recomp(g["id"])
+            if modo == "launcher" and not hay_launcher():
+                return
+            escribir(sal_rec, f"\n{g['nombre']}: {expl}\n")
+            lanzar([sys.executable, str(JUGAR), g["id"]], sal_rec, g["nombre"])
+
+    def modo_recomp():
+        g = rec_sel()
+        if not g:
+            return
+        if tipo_recomp(g["id"])[0] == "launcher" and not si_no(
+                "Modo directo", f"{g['nombre']} se abrirá sin RecompLauncher: más ligero y, si es ARM64, con el overlay de Steam.\n\n"
+                "Pero se salta su preparación (tu copia del juego, ajustes, efectos, partidas en la nube). Úsalo después de "
+                "haberla jugado una vez con RecompLauncher. Se puede volver atrás con el mismo botón.\n\n¿Activar el modo directo?"):
+            return
+        r = cambiar_modo_recomp(g["id"])
+        if r is None:
+            info("Modo directo", "Solo para builds de Linux: esta es de Windows o no se sabe qué programa es.")
+            return
+        escribir(sal_rec, f"\n{g['nombre']}: {r[2]}\n(El acceso de Steam no cambia: decide al arrancar.)\n")
+        pintar_recomps(limpiar=False)
 
     def steam_rec():
         g = rec_sel()
@@ -806,7 +938,7 @@ def interfaz():
                        ("Recargar", lambda: pintar_recomps(avisar=True)),
                        ("Comparar ARM vs FEX", comparar), ("Resultados", resultados)):
         boton(barra, texto, cmd).pack(side="left", padx=(0, 10), pady=6)
-    for texto, cmd in (("Jugar", jugar), ("Añadir a Steam", steam_rec), ("Revisar binarios", revisar),
+    for texto, cmd in (("Jugar", jugar), ("Añadir a Steam", steam_rec), ("Directo / Launcher", modo_recomp), ("Revisar binarios", revisar),
                        ("← Volver", lambda: mostrar("inicio"))):
         boton(acciones, texto, cmd).pack(side="left", padx=(0, 10), pady=6)
     pantallas["recomps"] = {"marco": m, "foco": lambda: lb_rec,
@@ -876,12 +1008,18 @@ def interfaz():
         elif si_no("Copia de seguridad", f"¿Ejecutar {RESPALDO}?"):
             tarea(sal_h, "Copia de seguridad de Steam", ["bash", str(RESPALDO)])
 
+    def cambiar_auto():
+        poner_auto(not auto_activo())
+        escribir(sal_h, f"\nAñadir recomps a Steam automáticamente: {'sí' if auto_activo() else 'no'}\n"
+                        "(al cerrar RecompLauncher y al entrar en Recompilaciones; siempre con copia de seguridad antes)\n")
+
     def launcher_a_steam():
         if hay_launcher():
             pedir_steam(sal_h, acceso_launcher(), "RecompLauncher")
 
     botones_h = [("Buscar actualizaciones", buscar_actualizaciones), ("Actualizar todo", actualizar_todo),
                  ("Cambiar de versión", cambiar_version), ("Modo gráfico: cambiar", cambiar_graficos),
+                 ("Recomps a Steam: auto sí/no", cambiar_auto),
                  ("Añadir RecompLauncher a Steam", launcher_a_steam), ("Copia de seguridad de Steam", respaldo),
                  ("Diagnóstico", diagnostico), ("Ver registro", ver_registro),
                  ("Guardar esta salida", guardar_salida), ("← Volver", lambda: mostrar("inicio"))]
@@ -893,7 +1031,8 @@ def interfaz():
     pantallas["herr"] = {"marco": m, "foco": lambda: bh[0],
                          "al_entrar": lambda: escribir(sal_h, f"RecompLauncher: {version_actual() or 'no instalado'}"
                                                               f"\nVersiones guardadas: {len(versiones())}"
-                                                              f"\nModo gráfico: {modo_grafico()}\n", limpiar=True)}
+                                                              f"\nModo gráfico: {modo_grafico()}"
+                                                              f"\nRecomps a Steam automáticamente: {'sí' if auto_activo() else 'no'}\n", limpiar=True)}
 
     mostrar("inicio")
     raiz.mainloop()
@@ -921,13 +1060,20 @@ def cli(argv):
         print(f"Modo gráfico: {argv[1]}")
     elif cmd == "recomps":
         for g in recomps():
-            print(f"{g['id']}\t{g['nombre']}\t{g['version']}\t{g['ruta']}")
+            modo, etq, expl = tipo_recomp(g["id"])
+            print(f"{g['id']}\t{g['nombre']}\t{g['version']}\t[{etq}]\t{expl}")
     elif cmd == "acceso-recomp" and len(argv) == 2:
         print(acceso_recomp(argv[1]))
     elif cmd == "acceso-app" and len(argv) == 2:
         print(acceso_app(argv[1]))
     elif cmd == "acceso-launcher":
         print(acceso_launcher())
+    elif cmd == "auto-steam":
+        if not auto_activo() and "--forzar" not in argv:
+            print("Añadir recomps a Steam automáticamente está desactivado (Herramientas).")
+            return 0
+        print(time.strftime("== %Y-%m-%d %H:%M:%S auto-steam"))
+        return auto_steam()
     else:
         print(__doc__)
         return 1
