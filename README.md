@@ -46,7 +46,7 @@ el teclado en pantalla. Los avisos y confirmaciones salen dentro de la propia ve
 
 En el instalador (paso 1) o en la tienda → Herramientas → **«Dónde se guarda (SD)»** eliges memoria interna o la SD. En la SD, todo
 lo grande va a `<SD>/KonkrStore/`: RecompLauncher (y su caché, donde descomprime tu copia del juego), la biblioteca de recomps, los
-juegos de Switch, los programas instalados desde archivo y las comparaciones. En tu carpeta quedan **enlaces con los nombres de
+juegos de Switch, los programas instalados desde archivo, las comparaciones y Claude Code (konkr-claude). En tu carpeta quedan **enlaces con los nombres de
 siempre** (`~/juegos-switch`, `~/Applications/RecompLauncher`…), así los accesos de Steam y todo lo demás siguen igual. Lo que ya
 había se mueve (con confirmación y comprobando el espacio). La SD tiene que estar en **ext4** (como la formatea Steam). Si un día
 arrancas sin la SD, la tienda, el instalador y el lanzador avisan en lugar de fallar. Las apps Flatpak siguen en la memoria interna.

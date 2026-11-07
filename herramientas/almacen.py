@@ -26,6 +26,7 @@ CARPETAS = {   # nombre en <SD>/KonkrStore  →  ruta de siempre
     "biblioteca": HOME / "recomp/biblioteca",
     "comparar": HOME / "recomp/comparar",
     "RecompLauncher-cache": Path(os.environ.get("XDG_DATA_HOME", HOME / ".local/share")) / "com.recomplauncher.app/cache",   # descomprime ahí tu copia del juego y los mods
+    "claude-konkr": Path(os.environ.get("XDG_DATA_HOME", HOME / ".local/share")) / "claude-konkr",   # konkr-claude: ~340 MB por versión de Claude Code
 }
 BUENOS = {"ext4", "ext3", "btrfs", "xfs", "f2fs"}
 SISTEMA = {"squashfs", "tmpfs", "overlay", "proc", "sysfs", "devtmpfs", "ramfs", "fuse.portal", "erofs", "iso9660"}   # no son tarjetas ni discos
