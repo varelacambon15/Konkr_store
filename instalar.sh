@@ -64,7 +64,7 @@ if [ "$COMPROBAR" = 1 ]; then
 fi
 
 # ---------------------------------------------------------------- 0. comprobaciones
-paso "0/9 Comprobaciones (solo lectura)"
+paso "0/10 Comprobaciones (solo lectura)"
 if [ "$(id -u)" = 0 ]; then mal "No ejecutes esto como root ni con sudo."; exit 1; fi
 echo "    Arquitectura: $(uname -m)"
 FEX="$(command -v FEXInterpreter || command -v FEXLoader || true)"
@@ -77,19 +77,32 @@ ok "curl y python3 presentes"
 YA="$(instalada)"
 [ -n "$YA" ] && echo "    Versión instalada ahora: $YA"
 
-# ---------------------------------------------------------------- 1. carpetas
-paso "1/9 Carpetas en tu usuario: $BASE y ~/recomp"
+# ---------------------------------------------------------------- 1. dónde guardar
+paso "1/10 Dónde guardar lo grande (RecompLauncher, recomps, juegos de Switch, programas locales): memoria interna o SD"
+if ! python3 "$DIR/herramientas/almacen.py" comprobar; then
+    mal "Inserta la tarjeta SD donde está todo (o elige otro sitio en la tienda > Herramientas) y vuelve a ejecutar instalar.sh."; exit 1
+fi
+if [ -f "$HOME/recomp/ajustes/almacen" ]; then
+    ok "Elegido: $(cat "$HOME/recomp/ajustes/almacen") (se cambia en la tienda > Herramientas > Dónde se guarda)"
+elif [ "$SI" = 1 ]; then
+    echo "    Memoria interna (se cambia en la tienda > Herramientas > Dónde se guarda)"
+else
+    python3 "$DIR/herramientas/almacen.py" elegir </dev/tty || true
+fi
+
+# ---------------------------------------------------------------- 1b. carpetas
+paso "2/10 Carpetas en tu usuario: $BASE y ~/recomp"
 if [ -d "$BASE/descargas" ] && [ -d "$HOME/recomp/logs" ]; then
     ok "Ya existen"
 elif preguntar "Crear las carpetas"; then
-    mkdir -p "$BASE/descargas" "$HOME/recomp/biblioteca" "$HOME/recomp/logs" "$HOME/recomp/informes"
+    mkdir -p "$BASE/descargas" "$HOME/recomp/biblioteca/" "$HOME/recomp/logs" "$HOME/recomp/informes"
     ok "Hecho"
 else
     echo "    Cancelado."; exit 0
 fi
 
 # ---------------------------------------------------------------- 2. descarga
-paso "2/9 Obtener el AppImage de RecompLauncher"
+paso "3/10 Obtener el AppImage de RecompLauncher"
 if [ -n "$APPIMAGE_LOCAL" ]; then
     [ -f "$APPIMAGE_LOCAL" ] || { mal "No existe $APPIMAGE_LOCAL"; exit 1; }
     APPIMAGE="$BASE/descargas/$(basename "$APPIMAGE_LOCAL")"
@@ -127,7 +140,7 @@ fi
 chmod u+x "$APPIMAGE"
 
 # ---------------------------------------------------------------- 3. arquitectura
-paso "3/9 Arquitectura del AppImage"
+paso "4/10 Arquitectura del AppImage"
 if command -v file >/dev/null; then file -b "$APPIMAGE" | cut -c1-90 | sed 's/^/    file: /'; fi
 ARCH="$(python3 "$PY" arch "$APPIMAGE")"
 echo "    ELF: $ARCH"
@@ -140,7 +153,7 @@ esac
 # ---------------------------------------------------------------- 4. extraer
 VERSION="$(basename "$APPIMAGE" .AppImage)"
 DEST="$BASE/$VERSION"
-paso "4/9 Extraer el AppImage en $DEST (evita depender de FUSE)"
+paso "5/10 Extraer el AppImage en $DEST (evita depender de FUSE)"
 if [ -e "$DEST/AppRun" ]; then
     ok "Ya estaba extraído"
 elif preguntar "Extraer"; then
@@ -171,7 +184,7 @@ ok "actual -> $VERSION"
 python3 "$PY" "$DEST" | grep -E 'VEREDICTO|FALTAN|FEX:|no comprobadas' | head -15 | sed 's/^/    /' || true
 
 # ---------------------------------------------------------------- 5. lanzador
-paso "5/9 Lanzador: $APPS/lanzar_recomp.sh -> $DIR/lanzar_recomp.sh"
+paso "6/10 Lanzador: $APPS/lanzar_recomp.sh -> $DIR/lanzar_recomp.sh"
 chmod u+x "$DIR"/*.sh "$DIR"/herramientas/*.py 2>/dev/null || true
 if [ -e "$APPS/lanzar_recomp.sh" ] && [ ! -L "$APPS/lanzar_recomp.sh" ]; then
     mal "Ya existe un $APPS/lanzar_recomp.sh que no es un enlace: no lo toco."
@@ -182,7 +195,7 @@ fi
 
 # ---------------------------------------------------------------- 6. arte para Steam
 ARTE="$BASE/arte-steam"
-paso "6/9 (Opcional) Imágenes oficiales para el acceso de Steam: $ARTE"
+paso "7/10 (Opcional) Imágenes oficiales para el acceso de Steam: $ARTE"
 if [ -f "$ARTE/poster.jpg" ] && [ -f "$ARTE/hero.jpg" ] && [ -f "$ARTE/logo.png" ] && [ -f "$ARTE/header.jpg" ]; then
     ok "Ya están descargadas"
 elif preguntar "Descargar portada, fondo, logo y cabecera (≈1 MB)"; then
@@ -196,7 +209,7 @@ else
 fi
 
 # ---------------------------------------------------------------- 7. .desktop
-paso "7/9 (Opcional) Accesos en el menú del escritorio (~/.local/share/applications)"
+paso "8/10 (Opcional) Accesos en el menú del escritorio (~/.local/share/applications)"
 D1="$HOME/.local/share/applications/recomplauncher-fex.desktop"
 D2="$HOME/.local/share/applications/konkr-store.desktop"
 if [ -f "$D1" ] && [ -f "$D2" ]; then
@@ -233,7 +246,7 @@ fi
 
 # ---------------------------------------------------------------- 8. juegos de Switch automáticos
 UD="$HOME/.config/systemd/user"
-paso "8/9 (Opcional) Juegos de Switch (nx2konkr): al copiar una carpeta a ~/juegos-switch, se añade sola a Steam"
+paso "9/10 (Opcional) Juegos de Switch (nx2konkr): al copiar una carpeta a ~/juegos-switch, se añade sola a Steam"
 if ! command -v systemctl >/dev/null 2>&1; then
     echo "    Sin systemd: se añaden al abrir la tienda o al cerrar RecompLauncher."
 elif [ -f "$UD/konkr-switch.path" ] && systemctl --user is-enabled konkr-switch.path >/dev/null 2>&1; then
@@ -254,7 +267,7 @@ else
 fi
 
 # ---------------------------------------------------------------- 9. Pillow para las portadas
-paso "9/9 (Opcional) Pillow para ver las portadas JPEG/WebP en la tienda (un entorno de Python propio en $DIR/.venv)"
+paso "10/10 (Opcional) Pillow para ver las portadas JPEG/WebP en la tienda (un entorno de Python propio en $DIR/.venv)"
 if python3 -c 'import PIL.ImageTk' 2>/dev/null; then
     ok "El Python del sistema ya tiene Pillow"
 elif [ -x "$DIR/.venv/bin/python" ] && "$DIR/.venv/bin/python" -c 'import PIL.ImageTk' 2>/dev/null; then

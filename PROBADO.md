@@ -38,6 +38,17 @@ scripts que imitan lo justo y registran con qué se les llama.
 - `actualizar.sh` contra un repo git local: sin cambios → `git pull` y se relanza con la versión nueva; con
   cambios locales → no hace pull; con un archivo que se pisaría → git se niega y el script sigue.
 
+### Guardar en la SD
+- `almacen.py` con una «SD» ext4 de verdad (imagen montada en `/run/media/steamos/SD64`): lista solo discos reales (oculta squashfs,
+  tmpfs…), mueve las 6 carpetas a `<SD>/KonkrStore` y deja enlaces (el enlace interno `actual` de RecompLauncher sigue funcionando),
+  lo instalado después va a la SD, con la SD desmontada `comprobar` falla y `usar` se niega, y de vuelta a la memoria interna lo
+  devuelve todo. Se corrigió el margen de espacio (1 GB fijo impedía mover poco a una SD casi llena).
+- `instalar.sh` de principio a fin eligiendo la SD (usuario sin privilegios): RecompLauncher descargado y extraído en la SD.
+  Sin la SD: el instalador se detiene en el paso 1, el lanzador avisa y la tienda no falla.
+- La tienda: «Dónde se guarda (SD)» en Herramientas y «Guardado en:» en el inicio.
+- No probado: una SD real de la Konkr (punto de montaje y permisos de SteamOS ARM), exFAT (se rechaza por diseño), y el servicio de
+  systemd vigilando `~/juegos-switch` cuando es un enlace a la SD.
+
 ### Recompilaciones con portadas
 - Con un `library.json` y un `pc-catalog.json` simulados (4 recomps; portada, banner y logo PNG/JPEG para unas, una dirección
   inaccesible y una sin arte): cuadrícula con portadas, tarjetas con iniciales («MK64») cuando no hay imagen, navegación con flechas

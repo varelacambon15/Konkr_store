@@ -686,8 +686,14 @@ def interfaz():
 
     def entrar_inicio():
         v = version_actual() or "no instalado"
+        try:
+            alm = (RECOMP / "ajustes/almacen").read_text().strip() or "interna"
+        except OSError:
+            alm = "interna"
+        alm = "memoria interna" if alm == "interna" else Path(alm).name
+        rotas = [p for p in (BASE, SWITCH) if p.is_symlink() and not p.exists()]
         estado_lbl.configure(text=f"RecompLauncher: {v}   ·   FEX: {'sí' if fex() else 'NO encontrado'}   ·   "
-                                  f"Flatpak: {'sí' if flatpak() else 'no'}   ·   Recomps: {len(recomps())}")
+                                  f"Recomps: {len(recomps())}   ·   Guardado en: {alm}" + ("   ·   ⚠ ¡LA SD NO ESTÁ MONTADA!" if rotas else ""))
     pantallas["inicio"] = {"marco": m, "foco": lambda: tiles[0], "al_entrar": entrar_inicio}
 
     # ================= APLICACIONES
@@ -1334,13 +1340,32 @@ def interfaz():
                         "(las apps al instalarlas; las recomps al cerrar RecompLauncher; los juegos de Switch al copiarlos a\n"
                         " ~/juegos-switch; y todo al entrar en su sección. Siempre con copia de seguridad antes)\n")
 
+    def donde_guardar():
+        sys.path.insert(0, str(DIR / "herramientas"))
+        import almacen
+        ds = almacen.destinos(); act = almacen.actual()
+        ops = [("● " if d[0] == act else "   ") + d[1] for d in ds]
+        i = elegir_de("Dónde se guarda", "RecompLauncher, las recomps, los juegos de Switch y los programas locales. En la SD van a "
+                      "<SD>/KonkrStore; en tu carpeta quedan enlaces con los nombres de siempre (los accesos de Steam siguen igual). "
+                      "La SD debe estar en ext4 (como la formatea Steam).", ops, next((k for k, d in enumerate(ds) if d[0] == act), 0))
+        if i is None or ds[i][0] == act:
+            return
+        if not ds[i][3]:
+            info("Dónde se guarda", f"Esa no sirve: {ds[i][4]}"); return
+        total = sum(t for _n, _p, _d, e, t in almacen.estado() if e)
+        if not si_no("Dónde se guarda", f"Se moverá lo que ya hay ({total / 2**30:.1f} GB) a:\n{ds[i][1]}\n\nCierra antes RecompLauncher y los juegos. "
+                     "Puede tardar si hay mucho. ¿Continuar?"):
+            return
+        escribir(sal_h, "", limpiar=True)
+        tarea(sal_h, "Mover a " + ds[i][1], [sys.executable, str(DIR / "herramientas/almacen.py"), "usar", ds[i][0], "--si"], lambda c: entrar_inicio())
+
     def launcher_a_steam():
         if hay_launcher():
             pedir_steam(sal_h, acceso_launcher(), "RecompLauncher")
 
     botones_h = [("Buscar actualizaciones", buscar_actualizaciones), ("Actualizar todo", actualizar_todo),
                  ("Cambiar de versión", cambiar_version), ("Modo gráfico: cambiar", cambiar_graficos),
-                 ("A Steam: automático sí/no", cambiar_auto),
+                 ("A Steam: automático sí/no", cambiar_auto), ("Dónde se guarda (SD)", donde_guardar),
                  ("Añadir RecompLauncher a Steam", launcher_a_steam), ("Copia de seguridad de Steam", respaldo),
                  ("Diagnóstico", diagnostico), ("Ver registro", ver_registro),
                  ("Guardar esta salida", guardar_salida), ("← Volver", lambda: mostrar("inicio"))]

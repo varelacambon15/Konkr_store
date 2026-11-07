@@ -15,6 +15,8 @@ Al abrirla aparecen tres secciones:
 
 > RecompLauncher no incluye juegos ni los descarga: cada recomp necesita **tu propia copia** del juego.
 
+> **Guía de instalación completa, con todos los comandos para copiar y pegar: [INSTALAR.md](INSTALAR.md).**
+
 ## Instalación en un solo comando (Konsole, en Modo Escritorio)
 
 ```bash
@@ -39,6 +41,19 @@ También aparece en el menú del escritorio como **Konkr Store**, si aceptaste c
 
 **Controles:** flechas o cruceta para moverse · Intro / A para elegir · Esc / B para volver · Steam + X para
 el teclado en pantalla. Los avisos y confirmaciones salen dentro de la propia ventana, con botones grandes.
+
+## Guardar lo grande en la tarjeta SD
+
+En el instalador (paso 1) o en la tienda → Herramientas → **«Dónde se guarda (SD)»** eliges memoria interna o la SD. En la SD, todo
+lo grande va a `<SD>/KonkrStore/`: RecompLauncher (y su caché, donde descomprime tu copia del juego), la biblioteca de recomps, los
+juegos de Switch, los programas instalados desde archivo y las comparaciones. En tu carpeta quedan **enlaces con los nombres de
+siempre** (`~/juegos-switch`, `~/Applications/RecompLauncher`…), así los accesos de Steam y todo lo demás siguen igual. Lo que ya
+había se mueve (con confirmación y comprobando el espacio). La SD tiene que estar en **ext4** (como la formatea Steam). Si un día
+arrancas sin la SD, la tienda, el instalador y el lanzador avisan en lugar de fallar. Las apps Flatpak siguen en la memoria interna.
+
+```bash
+python3 ~/Konkr_store/herramientas/almacen.py estado
+```
 
 ## Portadas de las recomps
 

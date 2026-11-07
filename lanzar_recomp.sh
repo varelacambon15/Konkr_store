@@ -54,6 +54,10 @@ if [ -z "$FEX" ]; then
     aviso "No encuentro FEXInterpreter. Comprueba la instalación de FEX (ejecuta diagnostico.sh)."
     exit 1
 fi
+if [ -L "$BASE" ] && [ ! -e "$BASE" ]; then
+    aviso "RecompLauncher está en la tarjeta SD ($(readlink "$BASE")) y no está montada. Inserta la SD y vuelve a intentarlo."
+    exit 1
+fi
 if [ ! -e "$APPDIR/AppRun" ]; then
     aviso "No encuentro $APPDIR/AppRun. Ejecuta primero instalar.sh."
     exit 1

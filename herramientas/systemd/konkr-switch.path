@@ -5,7 +5,6 @@ Description=Konkr Store: juegos de Switch nuevos en ~/juegos-switch
 
 [Path]
 PathChanged=%h/juegos-switch
-MakeDirectory=yes
 Unit=konkr-switch.service
 
 [Install]
