@@ -8,7 +8,7 @@
 #                                    salida: 0 = al día, 10 = hay versión nueva, 2 = error
 #
 # Qué crea (todo dentro de tu carpeta de usuario):
-#   ~/Applications/RecompLauncher/descargas/   el AppImage descargado
+#   <carpeta de descargas>/RecompLauncher/     el AppImage descargado (Opciones de la tienda; por defecto ~/recomp/descargas)
 #   ~/Applications/RecompLauncher/<versión>/   el AppImage extraído (las versiones viejas se quedan)
 #   ~/Applications/RecompLauncher/actual       enlace a la versión en uso
 #   ~/Applications/RecompLauncher/arte-steam/  imágenes oficiales para ponerlas tú en Steam
@@ -83,19 +83,20 @@ if ! python3 "$DIR/herramientas/almacen.py" comprobar; then
     mal "Inserta la tarjeta SD donde está todo (o elige otro sitio en la tienda > Herramientas) y vuelve a ejecutar instalar.sh."; exit 1
 fi
 if [ -f "$HOME/recomp/ajustes/almacen" ]; then
-    ok "Elegido: $(cat "$HOME/recomp/ajustes/almacen") (se cambia en la tienda > Herramientas > Dónde se guarda)"
+    ok "Elegido: $(cat "$HOME/recomp/ajustes/almacen") (se cambia en la tienda > Opciones > Carpeta de instalaciones)"
 elif [ "$SI" = 1 ]; then
-    echo "    Memoria interna (se cambia en la tienda > Herramientas > Dónde se guarda)"
+    echo "    Memoria interna (se cambia en la tienda > Opciones > Carpeta de instalaciones)"
 else
     python3 "$DIR/herramientas/almacen.py" elegir </dev/tty || true
 fi
 
 # ---------------------------------------------------------------- 1b. carpetas
 paso "2/10 Carpetas en tu usuario: $BASE y ~/recomp"
-if [ -d "$BASE/descargas" ] && [ -d "$HOME/recomp/logs" ]; then
+DESC="$(python3 "$DIR/herramientas/almacen.py" descargas)/RecompLauncher"
+if [ -d "$BASE" ] && [ -d "$DESC" ] && [ -d "$HOME/recomp/logs" ]; then
     ok "Ya existen"
 elif preguntar "Crear las carpetas"; then
-    mkdir -p "$BASE/descargas" "$HOME/recomp/biblioteca/" "$HOME/recomp/logs" "$HOME/recomp/informes"
+    mkdir -p "$BASE" "$DESC" "$HOME/recomp/biblioteca/" "$HOME/recomp/logs" "$HOME/recomp/informes"
     ok "Hecho"
 else
     echo "    Cancelado."; exit 0
@@ -105,7 +106,7 @@ fi
 paso "3/10 Obtener el AppImage de RecompLauncher"
 if [ -n "$APPIMAGE_LOCAL" ]; then
     [ -f "$APPIMAGE_LOCAL" ] || { mal "No existe $APPIMAGE_LOCAL"; exit 1; }
-    APPIMAGE="$BASE/descargas/$(basename "$APPIMAGE_LOCAL")"
+    APPIMAGE="$DESC/$(basename "$APPIMAGE_LOCAL")"
     if [ "$APPIMAGE_LOCAL" != "$APPIMAGE" ]; then
         cp -f "$APPIMAGE_LOCAL" "$APPIMAGE"
     fi
@@ -119,10 +120,10 @@ else
     echo "    Release: $TAG"
     echo "    Archivo: $NOMBRE"
     echo "    SHA-256 publicado por GitHub: $SHA"
-    APPIMAGE="$BASE/descargas/$NOMBRE"
+    APPIMAGE="$DESC/$NOMBRE"
     if [ -f "$APPIMAGE" ]; then
         ok "Ya estaba descargado"
-    elif preguntar "Descargar $NOMBRE a $BASE/descargas"; then
+    elif preguntar "Descargar $NOMBRE a $DESC"; then
         curl -fL --progress-bar -o "$APPIMAGE.parcial" "$URL"
         mv -f "$APPIMAGE.parcial" "$APPIMAGE"
         ok "Descargado"

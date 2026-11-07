@@ -596,7 +596,7 @@ def interfaz():
                     en_ventana(lambda l=linea: escribir(salida, l))
                 codigo = p.wait()
             except OSError as e:
-                en_ventana(lambda: escribir(salida, f"Error: {e}\n"))
+                en_ventana(lambda err=str(e): escribir(salida, f"Error: {err}\n"))   # e deja de existir al salir del except
 
             def fin():
                 ocupado["v"] = False
@@ -676,10 +676,11 @@ def interfaz():
     for texto, destino in (("Aplicaciones\n\nTipo Discover:\napps de Flathub", "apps"),
                            ("Recompilaciones\n\nJuegos recompilados\ncon RecompLauncher", "recomps"),
                            ("Juegos de Switch\n\nTus juegos portados\ncon nx2konkr", "switch"),
-                           ("Herramientas\n\nActualizar, versiones,\ndiagnóstico…", "herr")):
-        t = boton(fila, texto, lambda d=destino: mostrar(d), ancho=22, alto=4)
-        t.configure(font=("sans", 20, "bold"))
-        t.grid(row=len(tiles) // 2, column=len(tiles) % 2, padx=14, pady=12)   # 2 x 2: cabe en cualquier pantalla
+                           ("Herramientas\n\nActualizar, versiones,\ndiagnóstico…", "herr"),
+                           ("Opciones\n\nDónde se guarda,\nSteam, gráficos", "opciones")):
+        t = boton(fila, texto, lambda d=destino: mostrar(d), ancho=18, alto=4)
+        t.configure(font=("sans", 18, "bold"))
+        t.grid(row=len(tiles) // 3, column=len(tiles) % 3, padx=12, pady=12)   # 3 columnas: caben en cualquier pantalla
         tiles.append(t)
     tk.Label(m, text="Flechas: moverse · Intro: elegir · Esc: volver/salir · Teclado en pantalla: Steam + X",
              font=("sans", 13), bg=FONDO, fg="#8f98a0").pack(side="bottom", pady=12)
@@ -1304,12 +1305,6 @@ def interfaz():
             usar_version(vs[i])
             escribir(sal_h, f"\nAhora se usa: {vs[i]}\n")
 
-    def cambiar_graficos():
-        nuevo = "normal" if modo_grafico() == "seguro" else "seguro"
-        poner_modo_grafico(nuevo)
-        escribir(sal_h, f"\nModo gráfico de RecompLauncher: {nuevo}\n"
-                        "(seguro = sin compositing de WebKit; úsalo si ves la ventana en negro)\n")
-
     def diagnostico():
         escribir(sal_h, "", limpiar=True)
         tarea(sal_h, "Diagnóstico (solo lectura)", ["bash", str(DIR / "diagnostico.sh")])
@@ -1334,39 +1329,12 @@ def interfaz():
         elif si_no("Copia de seguridad", f"¿Ejecutar {RESPALDO}?"):
             tarea(sal_h, "Copia de seguridad de Steam", ["bash", str(RESPALDO)])
 
-    def cambiar_auto():
-        poner_auto(not auto_activo())
-        escribir(sal_h, f"\nAñadir a Steam automáticamente: {'sí' if auto_activo() else 'no'}\n"
-                        "(las apps al instalarlas; las recomps al cerrar RecompLauncher; los juegos de Switch al copiarlos a\n"
-                        " ~/juegos-switch; y todo al entrar en su sección. Siempre con copia de seguridad antes)\n")
-
-    def donde_guardar():
-        sys.path.insert(0, str(DIR / "herramientas"))
-        import almacen
-        ds = almacen.destinos(); act = almacen.actual()
-        ops = [("● " if d[0] == act else "   ") + d[1] for d in ds]
-        i = elegir_de("Dónde se guarda", "RecompLauncher, las recomps, los juegos de Switch y los programas locales. En la SD van a "
-                      "<SD>/KonkrStore; en tu carpeta quedan enlaces con los nombres de siempre (los accesos de Steam siguen igual). "
-                      "La SD debe estar en ext4 (como la formatea Steam).", ops, next((k for k, d in enumerate(ds) if d[0] == act), 0))
-        if i is None or ds[i][0] == act:
-            return
-        if not ds[i][3]:
-            info("Dónde se guarda", f"Esa no sirve: {ds[i][4]}"); return
-        total = sum(t for _n, _p, _d, e, t in almacen.estado() if e)
-        if not si_no("Dónde se guarda", f"Se moverá lo que ya hay ({total / 2**30:.1f} GB) a:\n{ds[i][1]}\n\nCierra antes RecompLauncher y los juegos. "
-                     "Puede tardar si hay mucho. ¿Continuar?"):
-            return
-        escribir(sal_h, "", limpiar=True)
-        tarea(sal_h, "Mover a " + ds[i][1], [sys.executable, str(DIR / "herramientas/almacen.py"), "usar", ds[i][0], "--si"], lambda c: entrar_inicio())
-
     def launcher_a_steam():
         if hay_launcher():
             pedir_steam(sal_h, acceso_launcher(), "RecompLauncher")
 
     botones_h = [("Buscar actualizaciones", buscar_actualizaciones), ("Actualizar todo", actualizar_todo),
-                 ("Cambiar de versión", cambiar_version), ("Modo gráfico: cambiar", cambiar_graficos),
-                 ("A Steam: automático sí/no", cambiar_auto), ("Dónde se guarda (SD)", donde_guardar),
-                 ("Añadir RecompLauncher a Steam", launcher_a_steam), ("Copia de seguridad de Steam", respaldo),
+                 ("Cambiar de versión", cambiar_version), ("Añadir RecompLauncher a Steam", launcher_a_steam), ("Copia de seguridad de Steam", respaldo),
                  ("Diagnóstico", diagnostico), ("Ver registro", ver_registro),
                  ("Guardar esta salida", guardar_salida), ("← Volver", lambda: mostrar("inicio"))]
     bh = []
@@ -1379,6 +1347,112 @@ def interfaz():
                                                               f"\nVersiones guardadas: {len(versiones())}"
                                                               f"\nModo gráfico: {modo_grafico()}"
                                                               f"\nA Steam automáticamente (apps, recomps y juegos de Switch): {'sí' if auto_activo() else 'no'}\n", limpiar=True)}
+
+    # ================= OPCIONES: dónde se guarda, Steam automático, modo gráfico
+    import almacen
+    m = tk.Frame(raiz, bg=FONDO)
+    cabecera(m, "Opciones")
+    cuadro_o = tk.Frame(m, bg=FONDO)
+    cuadro_o.pack(fill="x", padx=24, pady=6)
+    sal_o = caja_texto(m, 12)
+    sal_o.pack(fill="both", expand=True, padx=24, pady=(6, 16))
+
+    def corto(p):
+        p = str(p); h = str(HOME)
+        return "~" + p[len(h):] if p == h or p.startswith(h + "/") else p
+
+    def elegir_carpeta(titulo, texto, inicio):
+        """Explorador de carpetas manejable con el mando: devuelve la carpeta elegida o None."""
+        cur = almacen._ancestro(Path(inicio))
+        while True:
+            try:
+                subs = sorted((d for d in cur.iterdir() if d.is_dir() and not d.name.startswith(".")), key=lambda d: d.name.lower())[:80]
+            except OSError:
+                subs = []
+            discos = [("⌂  Memoria interna (tu carpeta personal)", HOME)] + [("▣  " + d[1], Path(d[0])) for d in almacen.destinos() if d[0] != "interna"]
+            ops = [f"✔  Elegir esta carpeta:  {corto(cur)}", "↑  Subir", "+  Nueva carpeta aquí…"] + [d[0] for d in discos] + ["▸  " + d.name for d in subs]
+            i = elegir_de(titulo, texto + f"\n\nAhora en: {cur}", ops)
+            if i is None:
+                return None
+            if i == 0:
+                return cur
+            if i == 1:
+                cur = cur.parent if cur != cur.parent else cur
+            elif i == 2:
+                n = capa_modal("Nueva carpeta", f"Nombre de la nueva carpeta dentro de {cur} (teclado en pantalla: Steam + X):",
+                               [("Crear", "__ok__"), ("Cancelar", None)], entrada=True)
+                if n and "/" not in n:
+                    try:
+                        (cur / n).mkdir(exist_ok=True); cur = cur / n
+                    except OSError as e:
+                        info("Nueva carpeta", f"No se pudo crear: {e}")
+            elif i < 3 + len(discos):
+                cur = discos[i - 3][1]
+            else:
+                cur = subs[i - 3 - len(discos)]
+
+    def cambiar_instalaciones():
+        act = almacen.raiz_de(almacen.actual())
+        p = elegir_carpeta("Carpeta de instalaciones", "Dónde van RecompLauncher, las recomps, los juegos de Switch, los programas "
+                           "instalados desde archivo y Claude Code. Si eliges la raíz de una tarjeta, se usa <tarjeta>/KonkrStore. "
+                           "Tiene que ser un disco ext4 (como formatea Steam las SD).", act if act != HOME else HOME)
+        if p is None:
+            return
+        raiz_n = almacen.raiz_de("interna" if Path(p) == HOME else str(p))
+        if raiz_n == act:
+            info("Carpeta de instalaciones", "Ya es esa."); return
+        ok, motivo = almacen.sirve_para_instalar(raiz_n)
+        if not ok:
+            info("Carpeta de instalaciones", f"Esa no sirve para instalar: {motivo}"); return
+        total = sum(t for _n, _p, _d, e, t in almacen.estado() if e)
+        if not si_no("Carpeta de instalaciones", f"Las instalaciones irán a:\n{raiz_n}\n\nLo que ya hay ({total / 2**30:.1f} GB) se moverá allí. "
+                     "En tu carpeta quedan enlaces con los nombres de siempre (los accesos de Steam siguen igual).\n\n"
+                     "Cierra antes RecompLauncher y los juegos. ¿Continuar?"):
+            return
+        escribir(sal_o, "", limpiar=True)
+        tarea(sal_o, f"Mover las instalaciones a {raiz_n}",
+              [sys.executable, str(DIR / "herramientas/almacen.py"), "usar", "interna" if Path(p) == HOME else str(p), "--si"], lambda c: pintar_opciones(False))
+
+    def cambiar_descargas():
+        p = elegir_carpeta("Carpeta de descargas", "Dónde se guardan los archivos que se descargan (RecompLauncher, comparaciones…) y el primer "
+                           "sitio donde «Instalar archivo…» busca. Vale cualquier disco, también una tarjeta o memoria USB en exFAT.",
+                           almacen.descargas())
+        if p is None:
+            return
+        out = []
+        almacen.poner_descargas(p, out.append)
+        escribir(sal_o, "\n" + "\n".join(out) + "\n(Las descargas anteriores se quedan donde estaban.)\n")
+        pintar_opciones(False)
+
+    def cambiar_auto_o():
+        poner_auto(not auto_activo()); pintar_opciones(False)
+
+    def cambiar_graficos_o():
+        poner_modo_grafico("normal" if modo_grafico() == "seguro" else "seguro"); pintar_opciones(False)
+
+    bo = {}
+    for clave, cmd in (("inst", cambiar_instalaciones), ("desc", cambiar_descargas), ("auto", cambiar_auto_o), ("graf", cambiar_graficos_o),
+                       ("volver", lambda: mostrar("inicio"))):
+        b = boton(cuadro_o, "", cmd)
+        b.configure(anchor="w", justify="left")
+        b.pack(fill="x", pady=4)
+        bo[clave] = b
+
+    def pintar_opciones(limpiar=True):
+        rotas = almacen.comprobar()
+        inst = almacen.raiz_de(almacen.actual())
+        bo["inst"].configure(text=f"Carpeta de instalaciones:   {corto(inst)}" + ("   (⚠ no está montada)" if rotas else ""))
+        bo["desc"].configure(text=f"Carpeta de descargas:   {corto(almacen.descargas())}")
+        bo["auto"].configure(text=f"Añadir a Steam automáticamente (apps, recomps, juegos de Switch):   {'sí' if auto_activo() else 'no'}")
+        bo["graf"].configure(text=f"Modo gráfico de RecompLauncher:   {modo_grafico()}   (seguro: si su ventana sale en negro)")
+        bo["volver"].configure(text="← Volver")
+        if limpiar:
+            escribir(sal_o, "Elige una opción con las flechas e Intro.\n\nInstalaciones: van a la carpeta elegida; en tu carpeta personal quedan "
+                            "enlaces con los nombres de siempre (~/juegos-switch, ~/Applications/...), así los accesos de Steam no cambian.\n"
+                            "Descargas: solo archivos, así que vale cualquier disco.\n", limpiar=True)
+        if rotas:
+            escribir(sal_o, "\n⚠ La carpeta de instalaciones está en un disco que no está montado: inserta la tarjeta.\n")
+    pantallas["opciones"] = {"marco": m, "foco": lambda: bo["inst"], "al_entrar": pintar_opciones}
 
     mostrar("inicio")
     raiz.mainloop()

@@ -45,7 +45,13 @@ scripts que imitan lo justo y registran con qué se les llama.
   devuelve todo. Se corrigió el margen de espacio (1 GB fijo impedía mover poco a una SD casi llena).
 - `instalar.sh` de principio a fin eligiendo la SD (usuario sin privilegios): RecompLauncher descargado y extraído en la SD.
   Sin la SD: el instalador se detiene en el paso 1, el lanzador avisa y la tienda no falla.
-- La tienda: «Dónde se guarda (SD)» en Herramientas y «Guardado en:» en el inicio.
+- **Opciones** (pantalla nueva): carpeta de instalaciones con un explorador de carpetas (entrar en la SD, crear «Juegos», elegirla →
+  lo instalado se movió a `SD64/Juegos/…` y `~/juegos-switch` apunta allí), carpeta de descargas, Steam automático y modo gráfico.
+  `almacen.py` acepta cualquier carpeta: la raíz de una tarjeta → `KonkrStore`; rechaza una carpeta dentro de las que se mueven y un
+  disco sin permisos de ejecución (tmpfs) para instalar, pero lo acepta para descargas. RecompLauncher, las comparaciones e «Instalar
+  archivo…» usan la carpeta de descargas.
+- pyflakes encontró un fallo anterior: si un programa no se podía lanzar, el mensaje de error de la tienda fallaba (la variable del
+  `except` ya no existía). Corregido.
 - No probado: una SD real de la Konkr (punto de montaje y permisos de SteamOS ARM), exFAT (se rechaza por diseño), y el servicio de
   systemd vigilando `~/juegos-switch` cuando es un enlace a la SD.
 

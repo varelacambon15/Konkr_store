@@ -87,9 +87,9 @@ Primer arranque, para iniciar sesión con tu cuenta de Claude:
 git -C ~/Konkr_store pull && ~/Konkr_store/instalar.sh
 ```
 
-## Mover lo grande a la SD (o de vuelta) más adelante
+## Cambiar dónde se guardan las instalaciones y las descargas
 
-En la tienda → Herramientas → «Dónde se guarda (SD)». O en la terminal:
+En la tienda → **Opciones** → «Carpeta de instalaciones» (y «Carpeta de descargas»). O en la terminal:
 
 ```bash
 python3 ~/Konkr_store/herramientas/almacen.py elegir

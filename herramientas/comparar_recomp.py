@@ -29,6 +29,9 @@ ACCESOS = HOME / "recomp/accesos"
 MEDIR = DIR / "herramientas/medir_y_lanzar.sh"
 sys.path.insert(0, str(DIR / "herramientas"))
 from revisar_binarios import arch_de  # noqa: E402
+from almacen import descargas  # noqa: E402
+
+DESCARGAS = descargas()          # Opciones de la tienda: la carpeta de descargas (por defecto ~/recomp/descargas)
 
 ARCH_ESPERADA = {"arm64": "aarch64", "x64": "x86_64"}
 
@@ -159,7 +162,7 @@ def preparar(rid, release_json=None):
         if not a:
             nombres = ", ".join(x["name"] for x in rel.get("assets", []))
             raise SystemExit(f"No encuentro la build {modo} en la release. Archivos: {nombres}")
-        archivo = base / "descargas" / a["name"]
+        archivo = DESCARGAS / "comparar" / rid / a["name"]
         descargar(a, archivo)
         carpeta = base / f"{modo}-{tag}"
         ya_extraida = carpeta.exists() and buscar_programa(carpeta, r["programa"])

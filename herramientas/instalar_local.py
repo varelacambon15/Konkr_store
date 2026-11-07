@@ -17,7 +17,6 @@ Cada programa va a ~/Applications/Locales/<Nombre>/ con su lanzador jugar.sh y k
 ~/recomp/accesos/local-<Nombre>.desktop (la tienda lo añade a Steam).
 """
 import json
-import lzma
 import os
 import re
 import shutil
@@ -381,7 +380,12 @@ def lista():
 
 def candidatos():
     """Archivos instalables en Descargas, Escritorio, la carpeta personal y memorias USB / microSD, recientes primero."""
-    sitios = [HOME / n for n in ("Downloads", "Descargas", "Desktop", "Escritorio")] + [HOME]
+    try:
+        from almacen import descargas
+        propia = [descargas()]                      # la carpeta de descargas elegida en Opciones, la primera
+    except ImportError:
+        propia = []
+    sitios = propia + [HOME / n for n in ("Downloads", "Descargas", "Desktop", "Escritorio")] + [HOME]
     media = Path("/run/media") / os.environ.get("USER", "")
     if media.is_dir():
         sitios += [p for p in media.iterdir() if p.is_dir()]

@@ -11,7 +11,8 @@ Al abrirla aparecen tres secciones:
 | **Aplicaciones** | Tipo Discover: aplicaciones **Flatpak de Flathub** (destacadas, búsqueda, instaladas, actualizar todas). Instala siempre **en tu usuario** (`flatpak --user`), sin sudo. Antes de instalar comprueba que la app exista para ARM64. |
 | **Recompilaciones** | Al estilo de [RecompLauncher](https://github.com/elripalda/RecompLauncher): **cuadrícula de portadas** (las de su catálogo, o las que elegiste en él) y un **panel de detalle** con su banner, logo, juego, género y descripción. **Jugar**, **Añadir a Steam**, **Revisar binarios** y **Descargar recomps** (abre RecompLauncher). Las nuevas van a Steam solas. |
 | **Juegos de Switch** | Los juegos portados con nx2konkr que copias a `~/juegos-switch`: se añaden a Steam solos. |
-| **Herramientas** | Buscar actualizaciones, actualizar todo, cambiar de versión de RecompLauncher, modo gráfico, añadir RecompLauncher a Steam, copia de seguridad de Steam, diagnóstico, ver registro, guardar la salida. |
+| **Herramientas** | Buscar actualizaciones, actualizar todo, cambiar de versión de RecompLauncher, añadir RecompLauncher a Steam, copia de seguridad de Steam, diagnóstico, ver registro, guardar la salida. |
+| **Opciones** | **Carpeta de instalaciones** y **carpeta de descargas** (con un explorador de carpetas: memoria interna, SD o cualquier carpeta), añadir a Steam automáticamente y modo gráfico de RecompLauncher. |
 
 > RecompLauncher no incluye juegos ni los descarga: cada recomp necesita **tu propia copia** del juego.
 
@@ -44,8 +45,9 @@ el teclado en pantalla. Los avisos y confirmaciones salen dentro de la propia ve
 
 ## Guardar lo grande en la tarjeta SD
 
-En el instalador (paso 1) o en la tienda → Herramientas → **«Dónde se guarda (SD)»** eliges memoria interna o la SD. En la SD, todo
-lo grande va a `<SD>/KonkrStore/`: RecompLauncher (y su caché, donde descomprime tu copia del juego), la biblioteca de recomps, los
+En el instalador (paso 1) o en la tienda → **Opciones** → «Carpeta de instalaciones» eliges, con un explorador de carpetas que
+se maneja con el mando, la memoria interna, la SD o cualquier carpeta de ellas (la raíz de una tarjeta → `<SD>/KonkrStore/`). Allí
+va todo lo grande: RecompLauncher (y su caché, donde descomprime tu copia del juego), la biblioteca de recomps, los
 juegos de Switch, los programas instalados desde archivo, las comparaciones y Claude Code (konkr-claude). En tu carpeta quedan **enlaces con los nombres de
 siempre** (`~/juegos-switch`, `~/Applications/RecompLauncher`…), así los accesos de Steam y todo lo demás siguen igual. Lo que ya
 había se mueve (con confirmación y comprobando el espacio). La SD tiene que estar en **ext4** (como la formatea Steam). Si un día

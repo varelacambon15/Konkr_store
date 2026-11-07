@@ -8,9 +8,12 @@ exFAT/FAT/NTFS los programas no se pueden ejecutar.
 
   almacen.py destinos               memoria interna y tarjetas montadas, con espacio libre y si sirven
   almacen.py estado                 dónde está ahora cada carpeta y cuánto ocupa
-  almacen.py usar RUTA|interna      mueve las carpetas allí (pide confirmación; --si para no preguntar)
+  almacen.py usar RUTA|interna      mueve las instalaciones allí: la raíz de una tarjeta (→ <tarjeta>/KonkrStore) o cualquier carpeta
+                                    (pide confirmación; --si para no preguntar)
   almacen.py elegir                 menú en la terminal (lo usa instalar.sh)
   almacen.py comprobar              falla (código 1) si una carpeta apunta a una SD que no está montada
+  almacen.py instalaciones          la carpeta donde van las instalaciones
+  almacen.py descargas [RUTA]       la carpeta de descargas (o la cambia: vale cualquier disco escribible, también exFAT)
 """
 import os
 import shutil
@@ -115,28 +118,75 @@ def _mover(origen, destino, decir):
     origen.rmdir()
 
 
+def _ancestro(p):
+    p = Path(p)
+    while not p.exists() and p != p.parent:
+        p = p.parent
+    return p
+
+
+def montaje(p):
+    """(punto de montaje, sistema de archivos, opciones) del disco que contiene p."""
+    real = str(_ancestro(p).resolve()); mejor = ("/", "", [])
+    try:
+        for l in open("/proc/mounts").read().splitlines():
+            c = l.split()
+            if len(c) < 4:
+                continue
+            punto = c[1].replace("\\040", " ")
+            if (real == punto or real.startswith(punto.rstrip("/") + "/")) and len(punto) >= len(mejor[0]):
+                mejor = (punto, c[2], c[3].split(","))
+    except OSError:
+        pass
+    return mejor
+
+
+def sirve_para_instalar(p):
+    """(sirve, motivo) para instalar programas en p: ext4/btrfs..., con permiso de ejecución y escribible."""
+    punto, fs, opts = montaje(p)
+    if fs and fs not in BUENOS:
+        return False, f"{fs}: no guarda permisos de ejecución ni enlaces (sirve para descargas, no para instalar; Steam formatea las SD en ext4)"
+    if "noexec" in opts:
+        return False, "el disco está montado sin permiso de ejecución (noexec)"
+    if not os.access(_ancestro(p), os.W_OK):
+        return False, "sin permiso de escritura para tu usuario"
+    return True, ""
+
+
+def raiz_de(destino):
+    """La carpeta donde irán las instalaciones: la raíz de una tarjeta → <tarjeta>/KonkrStore; otra carpeta → ella misma."""
+    if destino == "interna":
+        return HOME
+    p = Path(destino).expanduser().resolve()
+    return p / "KonkrStore" if p in {Path(d[0]) for d in destinos() if d[0] != "interna"} else p
+
+
 def usar(destino, decir=print):
-    """Lleva las carpetas a destino (una ruta de destinos() o 'interna') y deja los enlaces. Devuelve 0 bien, 1 no se puede."""
-    ds = {d[0]: d for d in destinos()}
+    """Lleva las carpetas a destino ('interna', la raíz de una tarjeta o cualquier carpeta) y deja los enlaces. 0 bien, 1 no se puede."""
     if destino != "interna":
-        destino = str(Path(destino).resolve())
-        d = ds.get(destino)
-        if d and not d[3]:
-            decir(f"No sirve: {d[4]}"); return 1
-        if not d and not Path(destino).is_dir():
-            decir(f"No existe {destino}"); return 1
+        destino = str(Path(destino).expanduser().resolve())
+        raiz = raiz_de(destino)
+        if raiz == HOME:
+            destino = "interna"
+    raiz = raiz_de(destino)
+    if destino != "interna":
+        ok, motivo = sirve_para_instalar(raiz)
+        if not ok:
+            decir(f"No sirve: {motivo}"); return 1
+        for nombre, p in CARPETAS.items():
+            if raiz == p.resolve() or str(raiz).startswith(str(p.resolve()) + "/") or raiz == p or str(raiz).startswith(str(p) + "/"):
+                decir(f"No puede ser una carpeta dentro de {p} (es una de las que se mueven)"); return 1
     rotas = comprobar()
     if rotas:
         decir("Antes, monta la SD donde están: " + ", ".join(str(r[2]) for r in rotas)); return 1
-    raiz = HOME if destino == "interna" else Path(destino) / "KonkrStore"
-    # espacio: lo que hay que mover a ese disco
+    dev_destino = os.stat(_ancestro(raiz)).st_dev
     mover = 0
     for nombre, p, dest, existe, t in estado():
         ahora = dest if dest is not None else p
         nuevo = p if destino == "interna" else raiz / nombre
-        if existe and ahora.resolve() != nuevo.resolve() and os.stat(ahora).st_dev != os.stat(raiz if raiz.exists() else Path(destino if destino != "interna" else HOME)).st_dev:
+        if existe and ahora.resolve() != nuevo.resolve() and os.stat(ahora).st_dev != dev_destino:
             mover += t
-    libre = shutil.disk_usage(HOME if destino == "interna" else destino).free
+    libre = shutil.disk_usage(_ancestro(raiz)).free
     margen = min(2**30, int(libre * 0.05))
     if mover > libre - margen:
         decir(f"No cabe: hay que mover {_gb(mover)} y quedan {_gb(libre)} libres (con un margen de {_gb(margen)})"); return 1
@@ -155,7 +205,7 @@ def usar(destino, decir=print):
         if dest is not None and Path(dest).resolve() == nuevo.resolve():
             decir(f"{nombre}: ya está en {nuevo}"); continue
         decir(f"{nombre}: {dest or p} → {nuevo} ({_gb(t)})")
-        if dest is not None:                              # estaba en otra SD
+        if dest is not None:                              # estaba en otro sitio
             p.unlink()
             if dest.exists():
                 _mover(dest, nuevo, decir)
@@ -166,9 +216,34 @@ def usar(destino, decir=print):
         p.symlink_to(nuevo, target_is_directory=True)
     AJUSTE.parent.mkdir(parents=True, exist_ok=True)
     AJUSTE.write_text(destino + "\n")
-    decir(f"Listo: las descargas e instalaciones grandes van a {'la memoria interna' if destino == 'interna' else raiz}")
+    decir(f"Listo: las instalaciones van a {'la memoria interna' if destino == 'interna' else raiz}")
     if destino != "interna":
-        decir("En RecompLauncher, elige como biblioteca ~/recomp/biblioteca (ya apunta a la SD).")
+        decir("En RecompLauncher, elige como biblioteca ~/recomp/biblioteca (ya apunta allí).")
+    return 0
+
+
+# ---- la carpeta de descargas: solo archivos, así que vale cualquier disco escribible (también exFAT) ----
+AJUSTE_DESCARGAS = HOME / "recomp/ajustes/descargas"
+
+
+def descargas():
+    try:
+        p = Path(AJUSTE_DESCARGAS.read_text().strip())
+        if str(p) not in ("", "."):
+            return p
+    except OSError:
+        pass
+    return HOME / "recomp/descargas"
+
+
+def poner_descargas(p, decir=print):
+    p = Path(p).expanduser().resolve()
+    if not os.access(_ancestro(p), os.W_OK):
+        decir(f"No se puede escribir en {p}"); return 1
+    p.mkdir(parents=True, exist_ok=True)
+    AJUSTE_DESCARGAS.parent.mkdir(parents=True, exist_ok=True)
+    AJUSTE_DESCARGAS.write_text(str(p) + "\n")
+    decir(f"Las descargas van a {p}")
     return 0
 
 
@@ -180,6 +255,12 @@ def main(argv):
         print(f"Elegido: {actual()}")
         for nombre, p, dest, existe, t in estado():
             print(f"  {nombre:15} {_gb(t):>9}  {p}" + (f" → {dest}" + ("" if existe else "  ✗ NO ESTÁ (¿SD sin montar?)") if dest else ""))
+    elif argv[:1] == ["descargas"]:
+        if len(argv) == 2:
+            return poner_descargas(argv[1])
+        print(descargas())
+    elif argv[:1] == ["instalaciones"]:
+        print(raiz_de(actual()))
     elif argv[:1] == ["comprobar"]:
         rotas = comprobar()
         for n, p, d in rotas:
@@ -208,13 +289,13 @@ def main(argv):
             except EOFError:
                 r = ""
             if r.startswith("n"):
-                print("Memoria interna (se cambia en la tienda > Herramientas > Dónde se guarda)."); return 0
+                print("Memoria interna (se cambia en la tienda > Opciones > Carpeta de instalaciones)."); return 0
             try:
                 return usar(ruta)
             except (OSError, RuntimeError) as e:
                 print(f"Error: {e}"); return 1
         if not sd:
-            print("No hay ninguna tarjeta SD montada: se usa la memoria interna. (Si la insertas luego: tienda > Herramientas > Dónde se guarda.)")
+            print("No hay ninguna tarjeta SD montada: se usa la memoria interna. (Si la insertas luego: tienda > Opciones > Carpeta de instalaciones.)")
             return 0
         print("¿Dónde se guardan RecompLauncher, las recomps, los juegos de Switch y los programas locales?")
         for i, (_r, etq, _l, ok, _m) in enumerate(ds, 1):

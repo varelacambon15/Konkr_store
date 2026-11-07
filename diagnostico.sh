@@ -62,7 +62,9 @@ echo "libfuse2: $(ls /usr/lib/libfuse.so.2* 2>/dev/null | head -1 || true)"
 t "RecompLauncher"
 B="$HOME/Applications/RecompLauncher"
 ls -la "$B" 2>/dev/null || echo "Aún no instalado ($B)"
-for f in "$B"/descargas/*.AppImage; do
+DESC="$(python3 "$DIR/herramientas/almacen.py" descargas 2>/dev/null)/RecompLauncher"
+echo "Descargas: $DESC   ·   Instalaciones: $(python3 "$DIR/herramientas/almacen.py" instalaciones 2>/dev/null)"
+for f in "$DESC"/*.AppImage "$B"/descargas/*.AppImage; do
     [ -e "$f" ] || continue
     echo "AppImage: $f"
     command -v file >/dev/null && file -b "$f"
