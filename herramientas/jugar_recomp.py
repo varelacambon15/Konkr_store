@@ -8,14 +8,13 @@ Por defecto, a través de RecompLauncher (--play): prepara la recomp como siempr
 argumentos, efectos, partidas en la nube). Las builds de Linux las ejecuta sin Proton; solo las de Windows usan su Proton.
 Modo «directo» (opcional, por recomp, solo builds de Linux; Konkr Store > Recompilaciones > Directo / Launcher):
   · Linux aarch64  -> se ejecuta tal cual, nativa (sin FEX ni Proton; el overlay de Steam sigue funcionando)
-  · Linux x86_64   -> con FEXInterpreter, sin RecompLauncher de por medio
+  · Linux x86_64   -> con el traductor x86 (Box64, FEX o binfmt; herramientas/x86.py), sin RecompLauncher de por medio
   Se salta la preparación de RecompLauncher: úsalo después de jugar una vez con RecompLauncher.
 La elección se toma al arrancar, así que el acceso de Steam no cambia nunca. En Steam: sin herramienta de compatibilidad.
 Registro: ~/recomp/logs/jugar_<ID>.log
 """
 import json
 import os
-import shutil
 import sys
 from pathlib import Path
 
@@ -67,7 +66,7 @@ def directo_elegido(gid):
 
 
 def plan(gid):
-    """(modo, ejecutable, argumentos, carpeta, entorno extra, explicación); modo = launcher | nativo | fex."""
+    """(modo, ejecutable, argumentos, carpeta, entorno extra, explicación); modo = launcher | nativo | x86."""
     g = leer(gid)
     via = ("launcher", None, [], HOME, {})
     if not g:
@@ -77,7 +76,7 @@ def plan(gid):
         return via + ("build de Windows: RecompLauncher la abre con su propio Proton",)
     if tipo == "?":
         return via + ("RecompLauncher la prepara y la abre (no se sabe qué programa es)",)
-    sin = "Linux aarch64: nativa, sin FEX ni Proton" if tipo == "linux-arm64" else "Linux x86_64: con FEX, sin Proton"
+    sin = "Linux aarch64: nativa, sin traductor ni Proton" if tipo == "linux-arm64" else "Linux x86_64: traducida (Box64/FEX), sin Proton"
     if not directo_elegido(gid):
         return via + (f"{sin}; RecompLauncher la prepara y la abre",)
     carpeta = Path(g.get("path") or "")
@@ -90,7 +89,7 @@ def plan(gid):
         args += [a.replace("{copy}", g["manual"]["copy"]) for a in g["manual"].get("arg", "{copy}").split()]
     entorno = {k: str(v).replace("{install}", str(carpeta)) for k, v in (inicio.get("env") or {}).items()
                if not k.startswith("RECOMPLAUNCHER_")}
-    modo = "nativo" if arch == "aarch64" else "fex"
+    modo = "nativo" if arch == "aarch64" else "x86"
     return modo, prog, args, prog.parent, entorno, f"{sin}; directa, sin RecompLauncher"
 
 
@@ -119,13 +118,16 @@ def main(argv):
             return 1
         os.execve(str(LANZADOR), [str(LANZADOR), "--play", gid], env)
     os.chdir(carpeta)
-    if modo == "fex":
-        fex = shutil.which("FEXInterpreter") or shutil.which("FEXLoader")
-        if not fex:
-            print("No encuentro FEXInterpreter")
+    if modo == "x86":
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import x86
+        if not x86.traductor():
+            print("No encuentro cómo ejecutar x86_64 (ni Box64, ni FEX, ni binfmt)")
             return 1
         env.pop("LD_PRELOAD", None)                          # el overlay de Steam es ARM: un proceso x86 no puede cargarlo
-        os.execve(fex, [fex, str(prog), *args], env)
+        cmd = x86.orden(prog, args)
+        print("orden:", " ".join(cmd), flush=True)
+        os.execve(cmd[0], cmd, env)
     os.execve(str(prog), [str(prog), *args], env)            # nativo: se conserva LD_PRELOAD (overlay de Steam, ARM como el juego)
 
 

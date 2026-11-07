@@ -1,7 +1,7 @@
 # Konkr Store
 
 Tienda y panel para la **KONKR Pocket FIT** (Snapdragon 8 Gen 3, ARM64) con **SteamOS ARM** (port de
-hashtagbasit) y **FEX**. Se maneja con el mando o el teclado, y lo que instales se puede añadir a Steam
+hashtagbasit), que traduce los programas x86_64 con **Box64** (registrado en binfmt; la tienda también acepta FEX). Se maneja con el mando o el teclado, y lo que instales se puede añadir a Steam
 para abrirlo desde el Modo Juego / Big Picture como «juego que no es de Steam».
 
 Al abrirla aparecen tres secciones:
@@ -72,7 +72,7 @@ una ruta). Todo va a `~/Applications/Locales/<Nombre>/`, sin sudo, y se añade a
 
 | Archivo | Qué hace |
 |---|---|
-| **AppImage** | Lo extrae (sin FUSE) y crea su lanzador: ARM64 nativo, o x86_64 con FEX |
+| **AppImage** | Lo extrae (sin FUSE) y crea su lanzador: ARM64 nativo, o x86_64 traducido (Box64/FEX/binfmt) |
 | **.tar.gz / .tar.xz / .tar.zst / .zip** | Lo extrae (sin rutas peligrosas) y busca el programa principal y su arquitectura |
 | **.deb** y **paquetes de Arch** (`.pkg.tar.zst`) | Extrae su contenido en tu carpeta, sin instalarlo en el sistema. Si necesita librerías que SteamOS no tiene, no arrancará |
 | **.flatpak / .flatpakref** | `flatpak install --user` |
@@ -94,8 +94,8 @@ Las dos cosas se desactivan en Herramientas → «A Steam: automático sí/no» 
 
 | Etiqueta | Qué es | Cómo se abre |
 |---|---|---|
-| `[Linux ARM64]` | Binario aarch64 | Nativo: sin FEX ni Proton |
-| `[Linux x86·FEX]` | Binario Linux x86_64 | Con FEX, sin Proton |
+| `[Linux ARM64]` | Binario aarch64 | Nativo: sin traductor ni Proton |
+| `[Linux x86 (Box64/FEX)]` | Binario Linux x86_64 | Traducido con Box64 (o FEX), sin Proton |
 | `[Windows·Proton]` | `.exe` | RecompLauncher con su propio Proton (no probado en ARM) |
 | `[¿?]` | No se sabe qué programa es | RecompLauncher decide |
 
@@ -127,7 +127,7 @@ Desde la terminal:
 ~/Konkr_store/konkr_store.py switch
 ```
 
-## Comparar nativo ARM64 contra x86_64 + FEX
+## Comparar nativo ARM64 contra x86_64 traducido
 
 En Recompilaciones → **«Comparar ARM vs FEX»**. Por ahora está configurada **Zelda 64: Recompiled**, que
 publica las dos builds de Linux. La tienda:
@@ -247,8 +247,8 @@ Revisé su código fuente (0.90.0-beta.19):
 
 ## Cómo se ejecutan las recomps
 
-RecompLauncher es x86_64 y corre con FEX, así que elige las builds de Linux x86_64 de cada recomp, que
-deberían correr también con FEX (sin probar todavía en esta consola). Una recomp solo es nativa si su
+RecompLauncher es x86_64 y corre traducido (Box64 en esta consola), así que elige las builds de Linux x86_64 de cada recomp, que
+deberían correr también con Box64 (sin probar todavía en esta consola). Una recomp solo es nativa si su
 proyecto publica un binario `aarch64`. Para comprobar qué trae una: Recompilaciones → «Revisar binarios»,
 o la ventana
 
@@ -286,7 +286,7 @@ desde Steam.
 |---|---|
 | `instalar.sh` | Instala o actualiza RecompLauncher (`--si`, `--appimage RUTA`, `--comprobar`) |
 | `konkr_store.sh` / `konkr_store.py` | La tienda (ventana). `konkr_store.py estado` muestra el estado en la terminal |
-| `lanzar_recomp.sh` | Abre RecompLauncher con FEX (lo usan Steam y la tienda) |
+| `lanzar_recomp.sh` | Abre RecompLauncher con el traductor x86 (Box64/FEX/binfmt; lo usan Steam y la tienda) |
 | `actualizar.sh` | `git pull` + versión nueva de RecompLauncher |
 | `diagnostico.sh` | Diagnóstico de solo lectura |
 | `desinstalar.sh` | Desinstalación a la papelera |
@@ -296,7 +296,15 @@ desde Steam.
 | `datos/aplicaciones.json` | Lista de aplicaciones destacadas (edítala a tu gusto) |
 | `herramientas/jugar_recomp.py` | Abre una recomp (vía RecompLauncher o directa; lo usan sus accesos de Steam) |
 | `herramientas/comparar_recomp.py` | Descarga y prepara las builds ARM64 y x86_64 de una recomp para compararlas |
-| `herramientas/medir_y_lanzar.sh` | Lanza una build (nativa o con FEX) midiendo batería, temperatura y CPU |
+| `herramientas/medir_y_lanzar.sh` | Lanza una build (nativa o traducida) midiendo batería, temperatura y CPU |
 | `datos/comparar.json` | Recomps disponibles para comparar |
 
 Qué se ha probado y qué no: [PROBADO.md](PROBADO.md).
+
+## Traductor de x86_64
+
+Tu Konkr no trae `FEXInterpreter`: los programas Linux x86_64 los traduce **Box64**, registrado en el kernel
+(binfmt_misc), y FEX solo existe dentro de Proton ARM64 para los juegos de Windows. `herramientas/x86.sh`
+(y `x86.py`) eligen, por orden: `KONKR_X86` si lo defines, FEX o `box64` en el PATH, la entrada de binfmt
+(«directo»: se ejecuta el programa tal cual y el kernel lo pasa a Box64) y rutas habituales de Box64.
+Para forzar uno: `KONKR_X86=/ruta/a/box64 ~/Konkr_store/konkr_store.sh`.

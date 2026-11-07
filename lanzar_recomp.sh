@@ -49,9 +49,9 @@ if [ "${#args[@]}" -eq 0 ] && [ "$desde_steam" = 1 ] && [ -z "${RECOMP_ESCRITORI
     args=(--bigpicture)
 fi
 
-FEX="$(command -v FEXInterpreter || command -v FEXLoader || true)"
-if [ -z "$FEX" ]; then
-    aviso "No encuentro FEXInterpreter. Comprueba la instalación de FEX (ejecuta diagnostico.sh)."
+X86="$(sh "$(dirname "$TIENDA")/herramientas/x86.sh" || true)"   # FEX o Box64, o «directo» (binfmt)
+if [ -z "$X86" ]; then
+    aviso "No encuentro cómo ejecutar programas x86_64 (ni FEX ni Box64). Ejecuta diagnostico.sh y pásame la salida."
     exit 1
 fi
 if [ -L "$BASE" ] && [ ! -e "$BASE" ]; then
@@ -81,11 +81,17 @@ cd "$HOME" || exit 1
 lanzar() {   # $1 = modo gráfico. Devuelve el código de salida; deja la duración en $dura.
     if [ "$1" = "seguro" ]; then export WEBKIT_DISABLE_COMPOSITING_MODE=1; else unset WEBKIT_DISABLE_COMPOSITING_MODE; fi
     {
-        echo "$(date '+%F %T') Lanzando (gráficos: $1): $FEX $APPDIR/AppRun ${args[*]:-}"
+        echo "$(date '+%F %T') Lanzando (gráficos: $1, x86: $X86): $APPDIR/AppRun ${args[*]:-}"
         echo "  real: $(readlink -f "$APPDIR")  desde_steam=$desde_steam  DISPLAY=${DISPLAY:-}  WAYLAND=${WAYLAND_DISPLAY:-}"
     } >>"$LOG"
     local inicio=$SECONDS codigo
-    "$FEX" "$APPDIR/AppRun" "${args[@]}" >>"$LOG" 2>&1
+    # AppRun suele ser un script: se ejecuta tal cual y el programa x86_64 que lanza lo traduce el kernel (binfmt) o FEX.
+    # Si es un ELF x86_64, va con el traductor delante (salvo binfmt, que lo hace solo)
+    if [ "$X86" = directo ] || [ "$(head -c 2 "$APPDIR/AppRun")" = '#!' ]; then
+        "$APPDIR/AppRun" "${args[@]}" >>"$LOG" 2>&1
+    else
+        "$X86" "$APPDIR/AppRun" "${args[@]}" >>"$LOG" 2>&1
+    fi
     codigo=$?
     dura=$((SECONDS - inicio))
     echo "$(date '+%F %T') Terminó: código $codigo tras ${dura}s" >>"$LOG"

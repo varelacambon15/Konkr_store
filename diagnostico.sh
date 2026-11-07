@@ -13,17 +13,20 @@ echo "Usuario: $(id -un)   HOME: $HOME"
 echo "Escritorio: ${XDG_CURRENT_DESKTOP:-?}   DISPLAY=${DISPLAY:-}   WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-}"
 df -h "$HOME" | tail -1
 
-t "FEX"
-for b in FEXInterpreter FEXLoader FEXBash FEXRootFSFetcher FEXConfig; do
+t "Traductor x86_64 (Box64 / FEX / binfmt)"
+echo "Elegido por la tienda: $(sh "$DIR/herramientas/x86.sh" 2>/dev/null || echo '-- ninguno --')"
+for b in box64 FEXInterpreter FEXLoader FEXBash unsquashfs; do
     printf '%-18s %s\n' "$b" "$(command -v "$b" || echo '-- no encontrado --')"
 done
-FEXInterpreter --version 2>/dev/null | head -1
+command -v box64 >/dev/null && box64 --version 2>/dev/null | head -1
+command -v FEXInterpreter >/dev/null && FEXInterpreter --version 2>/dev/null | head -1
+command -v FEXBash >/dev/null && file -L "$(command -v FEXBash)" 2>/dev/null
 ls -la ~/.fex-emu 2>/dev/null || echo "$HOME/.fex-emu no existe"
-ls -la ~/.fex-emu/RootFS 2>/dev/null
-cat ~/.fex-emu/Config.json 2>/dev/null
-ls -la "${XDG_DATA_HOME:-$HOME/.local/share}/fex-emu" 2>/dev/null
 echo "binfmt_misc (x86 automático por el kernel):"
-found=0; for e in /proc/sys/fs/binfmt_misc/*; do case "${e,,}" in *fex*|*x86*) echo "  $e"; found=1 ;; esac; done; [ "$found" = 1 ] || echo "  ninguna entrada FEX/x86"
+for e in /proc/sys/fs/binfmt_misc/*; do
+    case "${e##*/}" in register|status) continue ;; esac
+    echo "  ${e##*/}:"; sed 's/^/      /' "$e" 2>/dev/null
+done
 
 t "Steam: herramientas de compatibilidad (solo listado)"
 ls -la ~/.local/share/Steam/compatibilitytools.d/ 2>/dev/null || echo "no existe"
@@ -43,7 +46,7 @@ else
     echo "flatpak: -- no --"
 fi
 
-t "Sensores (para comparar ARM64 vs FEX)"
+t "Sensores (para comparar ARM64 vs x86 traducido)"
 for b in /sys/class/power_supply/*; do
     [ -e "$b/type" ] || continue
     printf '  %-28s tipo=%s capacidad=%s power_now=%s current_now=%s voltage_now=%s\n' "$(basename "$b")" \

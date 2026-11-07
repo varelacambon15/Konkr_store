@@ -39,10 +39,10 @@ medir() {
 
 cd "$dir" || exit 1
 if [ "$modo" = "x64" ]; then
-    FEX="$(command -v FEXInterpreter || command -v FEXLoader || true)"
-    [ -n "$FEX" ] || { echo "No encuentro FEXInterpreter"; exit 1; }
+    X86="$(sh "$(dirname "$(readlink -f "$0")")/x86.sh" || true)"
+    [ -n "$X86" ] || { echo "No encuentro cómo ejecutar x86_64 (ni FEX ni Box64)"; exit 1; }
     unset LD_PRELOAD LD_LIBRARY_PATH          # librerías ARM de Steam: un proceso x86 no puede cargarlas
-    cmd=("$FEX" "./$prog")
+    if [ "$X86" = directo ]; then cmd=("./$prog"); else cmd=("$X86" "./$prog"); fi
 else
     unset LD_LIBRARY_PATH                     # se conserva LD_PRELOAD: el overlay de Steam es ARM, como el juego
     cmd=("./$prog")

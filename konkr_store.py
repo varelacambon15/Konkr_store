@@ -94,7 +94,13 @@ def poner_modo_grafico(modo):
 
 
 def fex():
-    return shutil.which("FEXInterpreter") or shutil.which("FEXLoader") or ""
+    """Traductor de x86_64 (Box64, FEX o «directo» por binfmt), o "" si no hay; ver herramientas/x86.py."""
+    try:
+        sys.path.insert(0, str(DIR / "herramientas"))
+        import x86
+        return x86.traductor() or ""
+    except Exception:
+        return ""
 
 
 def recomps():
@@ -113,7 +119,7 @@ def recomps():
     return sorted(out, key=lambda x: x["nombre"].lower())
 
 
-TIPOS = {"linux-arm64": "Linux ARM64", "linux-x64": "Linux x86·FEX", "windows": "Windows·Proton", "?": "¿?"}
+TIPOS = {"linux-arm64": "Linux ARM64", "linux-x64": "Linux x86 (Box64/FEX)", "windows": "Windows·Proton", "?": "¿?"}
 
 
 def _jugar():
@@ -693,7 +699,7 @@ def interfaz():
             alm = "interna"
         alm = "memoria interna" if alm == "interna" else Path(alm).name
         rotas = [p for p in (BASE, SWITCH) if p.is_symlink() and not p.exists()]
-        estado_lbl.configure(text=f"RecompLauncher: {v}   ·   FEX: {'sí' if fex() else 'NO encontrado'}   ·   "
+        estado_lbl.configure(text=f"RecompLauncher: {v}   ·   x86: {(Path(fex()).name if fex() != 'directo' else 'binfmt') if fex() else 'NO encontrado'}   ·   "
                                   f"Recomps: {len(recomps())}   ·   Guardado en: {alm}" + ("   ·   ⚠ ¡LA SD NO ESTÁ MONTADA!" if rotas else ""))
     pantallas["inicio"] = {"marco": m, "foco": lambda: tiles[0], "al_entrar": entrar_inicio}
 
@@ -741,7 +747,7 @@ def interfaz():
         if a.get("local"):
             i = a["local"]
             detalle.configure(text=f"{a['nombre']}\n\nInstalado desde archivo\n({i.get('tipo')}, "
-                                   f"{'ARM64 nativo' if i.get('arch') == 'aarch64' else 'x86_64 con FEX'})\n\n{Path(i.get('origen', '')).name}\n\n"
+                                   f"{'ARM64 nativo' if i.get('arch') == 'aarch64' else 'x86_64 traducido'})\n\n{Path(i.get('origen', '')).name}\n\n"
                                    f"{i.get('instalado', '')}\n\n{i['carpeta']}")
             return
         inst = apps_instaladas().get(a["id"])
@@ -776,7 +782,7 @@ def interfaz():
 
     def ver_instaladas():
         loc = [{"id": "local:" + Path(i["carpeta"]).name, "nombre": i["nombre"], "categoria": "Local",
-                "desc": f"{i['tipo']} · {'ARM64' if i['arch'] == 'aarch64' else 'x86_64·FEX'}", "local": i} for i in locales().lista()]
+                "desc": f"{i['tipo']} · {'ARM64' if i['arch'] == 'aarch64' else 'x86_64'}", "local": i} for i in locales().lista()]
         inst = apps_instaladas() if flatpak() else {}
         pintar_apps(loc + [{"id": i, "nombre": v[0], "desc": f"Versión {v[1]}", "categoria": f"Instalación: {v[2]}"}
                            for i, v in sorted(inst.items(), key=lambda x: x[1][0].lower())], "Instaladas")
@@ -1464,7 +1470,7 @@ def cli(argv):
     if cmd == "estado":
         print(f"RecompLauncher: {version_actual() or 'no instalado'}")
         print(f"Versiones: {', '.join(versiones()) or '-'}")
-        print(f"FEX: {fex() or 'no encontrado'}")
+        print(f"Traductor x86_64: {fex() or 'no encontrado'}")
         print(f"Flatpak: {flatpak() or 'no'}")
         print(f"Modo gráfico: {modo_grafico()}")
         print(f"Recomps: {len(recomps())}")

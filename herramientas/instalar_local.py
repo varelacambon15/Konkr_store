@@ -7,7 +7,7 @@
   instalar_local.py candidatos                    archivos instalables en Descargas, Escritorio y memorias USB
 
 Tipos:
-  AppImage             se extrae (sin FUSE); ARM64 se ejecuta nativo, x86_64 con FEX
+  AppImage             se extrae (sin FUSE); ARM64 se ejecuta nativo, x86_64 con Box64/FEX (o binfmt)
   .tar.* .tgz .zip     se extrae; se busca el programa principal (ELF o script) y su arquitectura
   .deb  .pkg.tar.*     se extrae su contenido (no se instala en el sistema); puede faltar alguna librería
   .flatpak .flatpakref flatpak install --user
@@ -235,17 +235,26 @@ LANZADOR = """#!/bin/sh
 DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 cd "$DIR/{carpeta_rel}" || exit 1
 unset LD_LIBRARY_PATH
-{extra}exec {fex}"$DIR/{prog_rel}" "$@"
+{extra}{fex}exec $X86 "$DIR/{prog_rel}" "$@"
 """
 
 
+def es_script(prog):
+    import x86
+    return x86.es_script(prog)
+
+
 def escribir_lanzador(dest, nombre, origen, prog, arch, libdirs=()):
-    fex = ""
-    if arch == "x86_64":
-        como = "con FEX (x86_64 traducido a ARM64)"
-        fex = '"$(command -v FEXInterpreter || command -v FEXLoader)" '
+    fex = "X86=\n"
+    if arch == "x86_64" and es_script(prog):
+        como = "script (AppRun): lo x86 que lance lo traduce el kernel (binfmt) o lo lanza él"
+    elif arch == "x86_64":
+        como = "traducido a ARM64 (Box64, FEX o binfmt; se decide al arrancar)"
+        # Traductor al arrancar: el de la tienda si sigue ahí; si no, box64/FEX del PATH; vacío = lo traduce el kernel (binfmt)
+        fex = ('X86="$(sh "' + str(Path(__file__).resolve().parent / "x86.sh") + '" 2>/dev/null || command -v box64 || command -v FEXInterpreter || true)"\n'
+               '[ "$X86" = directo ] && X86=""\n')
     elif arch == "aarch64":
-        como = "nativo, sin FEX ni Proton"
+        como = "nativo, sin traductor ni Proton"
     else:
         como = "script; lo que ejecute decide"
     extra = "unset LD_PRELOAD   # el overlay de Steam es ARM: un programa x86 no puede cargarlo\n" if arch == "x86_64" else ""
@@ -315,10 +324,10 @@ def instalar(archivo, nombre=None, programa=None, decir=print):
                 copia = tmp / "app.AppImage"; shutil.copyfile(archivo, copia); copia.chmod(0o755)
                 cmd = [str(copia), "--appimage-extract"]
                 if arch == "x86_64":
-                    fex = shutil.which("FEXInterpreter") or shutil.which("FEXLoader")
-                    if not fex:
-                        raise NoSePuede("es x86_64 y no encuentro FEXInterpreter")
-                    cmd = [fex] + cmd
+                    import x86
+                    if not x86.traductor():
+                        raise NoSePuede("es x86_64, no tengo unsquashfs y no encuentro Box64/FEX/binfmt para extraerlo")
+                    cmd = x86.orden(copia, ["--appimage-extract"])
                 r = subprocess.run(cmd, cwd=tmp, capture_output=True, text=True)
                 copia.unlink(missing_ok=True)
                 if (tmp / "squashfs-root").is_dir():
@@ -349,8 +358,10 @@ def instalar(archivo, nombre=None, programa=None, decir=print):
             arch = arch_real(prog)
         if arch not in ("aarch64", "x86_64"):
             raise NoSePuede("no sé de qué arquitectura es el programa")
-        if arch == "x86_64" and not (shutil.which("FEXInterpreter") or shutil.which("FEXLoader")):
-            decir("[aviso] es x86_64 y no encuentro FEX: no podrá ejecutarse")
+        if arch == "x86_64":
+            import x86
+            if not x86.traductor():
+                decir("[aviso] es x86_64 y no encuentro Box64, FEX ni binfmt: no podrá ejecutarse")
         escribir_lanzador(tmp, nombre, archivo.name, prog, arch, [d for d in libdirs])
         info = {"nombre": nombre, "tipo": t, "arch": arch, "programa": str(prog.relative_to(tmp)), "origen": str(archivo),
                 "instalado": time.strftime("%Y-%m-%d %H:%M:%S")}
@@ -361,7 +372,7 @@ def instalar(archivo, nombre=None, programa=None, decir=print):
         raise
     icono = icono_de(dest)
     acc = escribir_acceso(dest, nombre, icono)
-    decir(f"instalado en {dest} ({'ARM64 nativo' if arch == 'aarch64' else 'x86_64 con FEX'}); acceso {acc}")
+    decir(f"instalado en {dest} ({'ARM64 nativo' if arch == 'aarch64' else 'x86_64 traducido'}); acceso {acc}")
     return {"tipo": t, "carpeta": str(dest), "acceso": str(acc), "arch": arch, "nombre": nombre}
 
 

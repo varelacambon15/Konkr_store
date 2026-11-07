@@ -145,3 +145,11 @@ scripts que imitan lo justo y registran con qué se les llama.
   dice y muestra la lista de archivos de la release.
 - Que la build ARM64 de Zelda 64 (compilada en Ubuntu 22.04) arranque en SteamOS ARM con Turnip (Vulkan), y
   que los sensores de batería y temperatura de la KONKR estén en las rutas estándar de `/sys`.
+
+## Traductor x86_64 genérico (Box64 / FEX / binfmt)
+
+Probado aquí (PC x86_64, sin la Konkr): `x86.sh` y `x86.py` sin traductor (código 1), con un `box64` simulado en el
+PATH (lo eligen) y con `KONKR_X86=directo`; `x86.orden` pone el traductor delante de un ELF y no de un script
+(`AppRun`); `instalar_local.py` con un `.tar.gz` x86_64: su `jugar.sh` lo lanza con el `box64` simulado y, sin él,
+directamente (binfmt). `shellcheck` y `pyflakes` limpios.
+**No probado**: Box64 real de la Konkr, y si Box64 puede con RecompLauncher (Tauri + WebKitGTK).

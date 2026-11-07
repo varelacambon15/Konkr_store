@@ -67,9 +67,10 @@ fi
 paso "0/10 Comprobaciones (solo lectura)"
 if [ "$(id -u)" = 0 ]; then mal "No ejecutes esto como root ni con sudo."; exit 1; fi
 echo "    Arquitectura: $(uname -m)"
-FEX="$(command -v FEXInterpreter || command -v FEXLoader || true)"
-if [ -z "$FEX" ]; then mal "No encuentro FEXInterpreter. Sin FEX no se puede ejecutar RecompLauncher (x86_64)."; exit 1; fi
-ok "FEX: $FEX"
+X86="$(sh "$DIR/herramientas/x86.sh" || true)"   # FEX o Box64 (con su ruta), o «directo» si el kernel lo traduce solo (binfmt)
+if [ -z "$X86" ]; then mal "No encuentro cómo ejecutar programas x86_64 (ni FEX ni Box64). RecompLauncher es x86_64: sin eso no puede funcionar."; exit 1; fi
+if [ "$X86" = directo ]; then b=""; for f in /proc/sys/fs/binfmt_misc/*; do case "${f##*/}" in register|status) ;; *) b="$b ${f##*/}" ;; esac; done; ok "Programas x86_64: los traduce el kernel (binfmt:$b)"
+else ok "Programas x86_64: $X86"; fi
 for b in curl python3; do
     command -v "$b" >/dev/null || { mal "Falta $b"; exit 1; }
 done
@@ -146,8 +147,8 @@ if command -v file >/dev/null; then file -b "$APPIMAGE" | cut -c1-90 | sed 's/^/
 ARCH="$(python3 "$PY" arch "$APPIMAGE")"
 echo "    ELF: $ARCH"
 case "$ARCH" in
-    aarch64) ok "Es ARM64: correría nativo. (Este lanzador usa FEX igualmente; avísame y lo adaptamos.)" ;;
-    x86_64)  ok "Es x86_64: se ejecutará con FEX." ;;
+    aarch64) ok "Es ARM64: se ejecutará nativo." ;;
+    x86_64)  ok "Es x86_64: se ejecutará traducido ($(basename "$X86"))." ;;
     *)       mal "Arquitectura inesperada ($ARCH). No sigo."; exit 1 ;;
 esac
 
@@ -161,18 +162,20 @@ elif preguntar "Extraer"; then
     [ -e "$DEST" ] && mv "$DEST" "$DEST.incompleto.$(date +%s)"
     TMP="$BASE/.extrayendo.$$"
     mkdir -p "$TMP"
-    echo "    Método 1: $FEX $(basename "$APPIMAGE") --appimage-extract"
-    if (cd "$TMP" && "$FEX" "$APPIMAGE" --appimage-extract >"$HOME/recomp/logs/extraer.log" 2>&1) && [ -e "$TMP/squashfs-root/AppRun" ]; then
-        ok "Extraído con FEX"
-    elif command -v unsquashfs >/dev/null; then
-        echo "    Método 1 falló (ver ~/recomp/logs/extraer.log). Método 2: unsquashfs nativo."
-        [ -e "$TMP/squashfs-root" ] && mv "$TMP/squashfs-root" "$TMP/fallido1"
-        OFF="$(python3 "$PY" offset "$APPIMAGE")"
-        unsquashfs -q -o "$OFF" -d "$TMP/squashfs-root" "$APPIMAGE" >>"$HOME/recomp/logs/extraer.log" 2>&1 \
-            && ok "Extraído con unsquashfs (offset $OFF)" \
-            || { mal "unsquashfs también falló. Revisa ~/recomp/logs/extraer.log"; exit 1; }
+    : >"$HOME/recomp/logs/extraer.log"
+    # Método 1: unsquashfs nativo (no traduce nada). Método 2: el propio AppImage con --appimage-extract, traducido si es x86_64
+    if command -v unsquashfs >/dev/null && OFF="$(python3 "$PY" offset "$APPIMAGE")" \
+       && unsquashfs -q -o "$OFF" -d "$TMP/squashfs-root" "$APPIMAGE" >>"$HOME/recomp/logs/extraer.log" 2>&1 && [ -e "$TMP/squashfs-root/AppRun" ]; then
+        ok "Extraído con unsquashfs (offset $OFF)"
     else
-        mal "No se pudo extraer y no hay unsquashfs. Revisa ~/recomp/logs/extraer.log"; exit 1
+        [ -e "$TMP/squashfs-root" ] && mv "$TMP/squashfs-root" "$TMP/fallido1"
+        if [ "$ARCH" = aarch64 ] || [ "$X86" = directo ]; then CMD=("$APPIMAGE"); else CMD=("$X86" "$APPIMAGE"); fi
+        echo "    Sin unsquashfs: ${CMD[*]##*/} --appimage-extract"
+        if (cd "$TMP" && "${CMD[@]}" --appimage-extract >>"$HOME/recomp/logs/extraer.log" 2>&1) && [ -e "$TMP/squashfs-root/AppRun" ]; then
+            ok "Extraído con el propio AppImage"
+        else
+            mal "No se pudo extraer (mira ~/recomp/logs/extraer.log). Instala squashfs-tools o pásame el registro."; exit 1
+        fi
     fi
     mv "$TMP/squashfs-root" "$DEST"
     rmdir "$TMP" 2>/dev/null || echo "    (quedan restos en $TMP; puedes borrarlos tú)"
@@ -215,14 +218,14 @@ D1="$HOME/.local/share/applications/recomplauncher-fex.desktop"
 D2="$HOME/.local/share/applications/konkr-store.desktop"
 if [ -f "$D1" ] && [ -f "$D2" ]; then
     ok "Ya existen"
-elif preguntar "Crear los accesos «RecompLauncher (FEX)» y «Konkr Store»"; then
+elif preguntar "Crear los accesos «RecompLauncher» y «Konkr Store»"; then
     mkdir -p "$(dirname "$D1")"
     ICONO="$ARTE/poster.jpg"; [ -f "$ICONO" ] || ICONO="applications-games"
     cat >"$D1" <<EOF
 [Desktop Entry]
 Type=Application
-Name=RecompLauncher (FEX)
-Comment=RecompLauncher x86_64 ejecutado con FEX
+Name=RecompLauncher
+Comment=RecompLauncher (x86_64, traducido con FEX o Box64)
 Exec=$APPS/lanzar_recomp.sh
 Path=$HOME
 Icon=$ICONO
@@ -299,5 +302,5 @@ Para añadirlo a Steam (lo haces TÚ desde Steam; este script no toca Steam):
        Destino:     "$APPS/lanzar_recomp.sh"
        Iniciar en:  "$HOME"
        Opciones de lanzamiento:   --bigpicture
-       Compatibilidad: SIN forzar ninguna herramienta (ni Proton ni FEX de Steam).
+       Compatibilidad: SIN forzar ninguna herramienta (ni Proton).
 EOF
