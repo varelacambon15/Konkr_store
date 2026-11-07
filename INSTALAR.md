@@ -5,8 +5,8 @@ Nada usa `sudo` ni toca el sistema: todo va a tu carpeta de usuario o a la SD qu
 
 ## 0. Antes de empezar
 
-- Si quieres guardar lo grande en la **tarjeta SD**, que esté insertada y formateada por Steam (ext4). En exFAT/FAT/NTFS los programas
-  no se pueden ejecutar.
+- Si quieres guardar lo grande en la **tarjeta SD**, que esté insertada: el instalador la detecta solo. Si no sirve (exFAT/FAT/NTFS:
+  ahí los programas no se pueden ejecutar), lo dice; Steam las formatea en ext4, que sí sirve.
 - **Steam abierto** (para que los accesos se añadan solos).
 - Tu copia de seguridad de Steam en `~/iw6x-steamos/tools/respaldo_steam.sh` (sin ella, la tienda no añade nada a Steam
   automáticamente).
@@ -23,7 +23,7 @@ El instalador pregunta paso a paso. Lo que conviene responder:
 
 | Paso | Qué es | Respuesta |
 |---|---|---|
-| 1 | **Dónde guardar lo grande** | El número de tu **SD** (o Intro para la memoria interna) |
+| 1 | **Dónde guardar lo grande**: detecta la SD sola y pregunta «¿Guardar en la tarjeta SD …?» | **Intro** (sí). Si hay varias tarjetas, sale un menú con todas |
 | 2–6 | Carpetas, RecompLauncher (descarga, comprobación y extracción) | `s` |
 | 7 | Imágenes oficiales de RecompLauncher para Steam | `s` |
 | 8 | Accesos en el menú del escritorio | `s` |

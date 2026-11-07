@@ -196,6 +196,26 @@ def main(argv):
             print(f"Error: {e}"); return 1
     elif argv[:1] == ["elegir"]:
         ds = destinos()
+        sd = [d for d in ds if d[0] != "interna"]
+        validas = [d for d in sd if d[3]]
+        for d in sd:
+            if not d[3]:
+                print(f"Tarjeta {Path(d[0]).name}: no sirve ({d[4]})")
+        if len(validas) == 1 and actual() == "interna":   # una sola SD válida: se ofrece directamente (Intro = sí)
+            ruta, etq = validas[0][0], validas[0][1]
+            try:
+                r = input(f"¿Guardar lo grande en la tarjeta SD {etq}? [S/n] ").strip().lower()
+            except EOFError:
+                r = ""
+            if r.startswith("n"):
+                print("Memoria interna (se cambia en la tienda > Herramientas > Dónde se guarda)."); return 0
+            try:
+                return usar(ruta)
+            except (OSError, RuntimeError) as e:
+                print(f"Error: {e}"); return 1
+        if not sd:
+            print("No hay ninguna tarjeta SD montada: se usa la memoria interna. (Si la insertas luego: tienda > Herramientas > Dónde se guarda.)")
+            return 0
         print("¿Dónde se guardan RecompLauncher, las recomps, los juegos de Switch y los programas locales?")
         for i, (_r, etq, _l, ok, _m) in enumerate(ds, 1):
             print(f"  {i}) {etq}")
