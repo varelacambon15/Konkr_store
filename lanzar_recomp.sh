@@ -162,7 +162,19 @@ for par in "${pares[@]}"; do
     echo "$(date '+%F %T') $X86 (variante $variante) no arranca RecompLauncher: pruebo la siguiente" >>"$LOG"
 done
 if [ "$codigo" != 0 ] && [ "$dura" -lt 20 ]; then
-    aviso "RecompLauncher se cerró al arrancar (código $codigo). Mira el registro: $LOG"
+    # Todo falló: una pasada más con trazas de Box64 (variante 2) para saber qué librería no carga. Resumen en depuracion_box64.log
+    DEP="$LOGDIR/depuracion_box64.log"
+    entorno_box64 2
+    {
+        echo "== Box64 con trazas (variante 2), $(date '+%F %T')"
+        echo "BOX64_LD_LIBRARY_PATH=${BOX64_LD_LIBRARY_PATH:-}"; echo "BOX64_EMULATED_LIBS=${BOX64_EMULATED_LIBS:-}"; echo "RT=${RT:-}"
+        BOX64_LOG=1 BOX64_DLSYM_ERROR=1 "${cands[0]}" "$APPDIR/usr/bin/recomplauncher" 2>&1 | grep -v JUMP_SLOT | tail -30 | cut -c1-220
+    } >"$DEP" 2>&1
+    aviso_extra="Detalle técnico guardado en $DEP"
+    echo "$aviso_extra" >>"$LOG"
+fi
+if [ "$codigo" != 0 ] && [ "$dura" -lt 20 ]; then
+    aviso "RecompLauncher se cerró al arrancar (código $codigo). Mira el registro: $LOG y $LOGDIR/depuracion_box64.log"
 fi
 # Recomps instaladas en esta sesión: a Steam automáticamente (Konkr Store > Herramientas lo activa o desactiva), con copia de
 # seguridad antes y pidiéndoselo a Steam. En segundo plano y separado de Steam, para no retrasar ni depender de esta ventana
