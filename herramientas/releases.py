@@ -7,12 +7,16 @@
 Se usa desde instalar.sh y desde el panel konkr_store.py.
 """
 import json
+import platform
 import re
 import sys
 import urllib.request
 
 REPO = "elripalda/RecompLauncher"
 API = f"https://api.github.com/repos/{REPO}/releases?per_page=10"
+# RecompLauncher solo publica x86_64: en ARM64 se usa el que compila el workflow recomplauncher-arm64.yml de este repo.
+REPO_ARM = "varelacambon15/Konkr_store"
+API_ARM = f"https://api.github.com/repos/{REPO_ARM}/releases?per_page=10"
 
 
 def elegir(releases):
@@ -30,7 +34,36 @@ def elegir(releases):
     return None
 
 
+def elegir_arm(releases):
+    """La release ARM64 más reciente compilada por este repo (etiqueta recomplauncher-arm64-<versión>)."""
+    mejor = None
+    for r in releases:
+        if r.get("draft") or not str(r.get("tag_name", "")).startswith("recomplauncher-arm64-"):
+            continue
+        for a in r.get("assets", []):
+            n = a.get("name", "")
+            if n.lower().endswith(".appimage") and any(k in n.lower() for k in ("aarch64", "arm64")):
+                sha = (a.get("digest") or "").replace("sha256:", "") or "-"
+                cand = (r["tag_name"].replace("recomplauncher-arm64-", ""), n, a["browser_download_url"], sha)
+                if mejor is None or clave(cand[0]) > clave(mejor[0]):
+                    mejor = cand
+    return mejor
+
+
+def _json(url):
+    req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json", "User-Agent": "Konkr_store"})
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.load(resp)
+
+
 def ultima(datos=None):
+    if datos is None and platform.machine() in ("aarch64", "arm64"):
+        try:
+            nativa = elegir_arm(_json(API_ARM))
+        except Exception:
+            nativa = None
+        if nativa:
+            return nativa
     if datos is None:
         req = urllib.request.Request(API, headers={"Accept": "application/vnd.github+json", "User-Agent": "Konkr_store"})
         with urllib.request.urlopen(req, timeout=30) as resp:

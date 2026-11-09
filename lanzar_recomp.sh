@@ -53,7 +53,12 @@ fi
 # detecta x86.sh (Box64, binfmt). Se prueban uno tras otro hasta que RecompLauncher arranca. KONKR_X86=<ruta|directo> fuerza uno.
 cands=()
 agregar() { local c; for c in "${cands[@]:-}"; do [ "$c" = "$1" ] && return; done; cands+=("$1"); }
-if [ -n "${KONKR_X86:-}" ]; then
+# e_machine del ELF (byte 19): 0xb7 = ARM64 → nativo, sin traductor; 0x3e = x86_64
+nativo=0
+[ "$(od -An -tx1 -j18 -N2 "$APPDIR/usr/bin/recomplauncher" 2>/dev/null | tr -d ' \n')" = "b700" ] && nativo=1
+if [ "$nativo" = 1 ]; then
+    agregar directo
+elif [ -n "${KONKR_X86:-}" ]; then
     agregar "$KONKR_X86"
 else
     for c in FEXInterpreter FEXLoader; do p="$(command -v "$c" 2>/dev/null)" && agregar "$p"; done
@@ -136,13 +141,13 @@ dura=0; codigo=1
 pares=()
 for c in "${cands[@]}"; do
     case "$(basename "$c")" in
-        box64|directo) pares+=("$c|1" "$c|2" "$c|3") ;;
+        box64|directo) if [ "$nativo" = 1 ]; then pares+=("$c|0"); else pares+=("$c|1" "$c|2" "$c|3"); fi ;;
         *) pares+=("$c|1") ;;
     esac
 done
 for par in "${pares[@]}"; do
     X86="${par%|*}"; variante="${par##*|}"
-    entorno_box64 "$variante"
+    [ "$nativo" = 1 ] || entorno_box64 "$variante"
     echo "$(date '+%F %T') Variante $variante: BOX64_EMULATED_LIBS=${BOX64_EMULATED_LIBS:-}" >>"$LOG"
     dura=0
     lanzar "$modo"
