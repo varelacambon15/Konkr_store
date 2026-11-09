@@ -76,6 +76,12 @@ if [ "$desde_steam" = 1 ] && [ -n "${DISPLAY:-}" ]; then
     export GDK_BACKEND=x11
 fi
 export GDK_SCALE="${RECOMP_ESCALA:-1}"
+# Box64: libsoup del AppImage necesita GLib reciente (g_uri_*, g_task_set_static_name...); sin esto usa la GLib envuelta del
+# sistema, más antigua, y RecompLauncher sale con 255. Se emulan las GLib que trae el AppImage. FEX ignora estas variables.
+if [ -d "$APPDIR/usr/lib" ]; then
+    export BOX64_LD_LIBRARY_PATH="$APPDIR/usr/lib${BOX64_LD_LIBRARY_PATH:+:$BOX64_LD_LIBRARY_PATH}"
+    export BOX64_EMULATED_LIBS="${BOX64_EMULATED_LIBS:-libglib-2.0.so.0:libgobject-2.0.so.0:libgio-2.0.so.0:libgmodule-2.0.so.0}"
+fi
 cd "$HOME" || exit 1
 
 lanzar() {   # $1 = modo gráfico. Devuelve el código de salida; deja la duración en $dura.
