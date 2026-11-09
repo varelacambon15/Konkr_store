@@ -49,8 +49,19 @@ if [ "${#args[@]}" -eq 0 ] && [ "$desde_steam" = 1 ] && [ -z "${RECOMP_ESCRITORI
     args=(--bigpicture)
 fi
 
-X86="$(sh "$(dirname "$TIENDA")/herramientas/x86.sh" || true)"   # FEX o Box64, o «directo» (binfmt)
-if [ -z "$X86" ]; then
+# Traductores x86_64 posibles, por orden: FEX (en el PATH o en cualquier sitio de /usr, /opt, ~/.local), luego lo que
+# detecta x86.sh (Box64, binfmt). Se prueban uno tras otro hasta que RecompLauncher arranca. KONKR_X86=<ruta|directo> fuerza uno.
+cands=()
+agregar() { local c; for c in "${cands[@]:-}"; do [ "$c" = "$1" ] && return; done; cands+=("$1"); }
+if [ -n "${KONKR_X86:-}" ]; then
+    agregar "$KONKR_X86"
+else
+    for c in FEXInterpreter FEXLoader; do p="$(command -v "$c" 2>/dev/null)" && agregar "$p"; done
+    while IFS= read -r p; do [ -n "$p" ] && agregar "$p"; done < <(find /usr /opt "$HOME/.local" "$HOME/.fex-emu" -maxdepth 6 -type f \( -name FEXInterpreter -o -name FEXLoader \) 2>/dev/null)
+    p="$(sh "$(dirname "$TIENDA")/herramientas/x86.sh" || true)"
+    [ -n "$p" ] && agregar "$p"
+fi
+if [ "${#cands[@]}" -eq 0 ]; then
     aviso "No encuentro cómo ejecutar programas x86_64 (ni FEX ni Box64). Ejecuta diagnostico.sh y pásame la salida."
     exit 1
 fi
@@ -112,20 +123,25 @@ lanzar() {   # $1 = modo gráfico. Devuelve el código de salida; deja la duraci
     return $codigo
 }
 
-dura=0
-lanzar "$modo"
-codigo=$?
-# Si se cierra con error en menos de 20 s y no estaba ya en modo seguro, reintenta una vez en modo seguro.
-if [ "$codigo" != 0 ] && [ "$dura" -lt 20 ] && [ "$modo" != "seguro" ] && [ -z "${RECOMP_GRAFICOS:-}" ]; then
-    echo "$(date '+%F %T') Cierre rápido con error: reintento en modo gráfico seguro" >>"$LOG"
-    lanzar seguro
+dura=0; codigo=1
+for X86 in "${cands[@]}"; do
+    dura=0
+    lanzar "$modo"
     codigo=$?
-    if [ "$codigo" = 0 ] || [ "$dura" -ge 20 ]; then
-        mkdir -p "$(dirname "$PREF")"
-        echo seguro >"$PREF"
-        echo "$(date '+%F %T') El modo seguro funcionó: se recuerda en $PREF" >>"$LOG"
+    # Si se cierra con error en menos de 20 s y no estaba ya en modo seguro, reintenta una vez en modo seguro.
+    if [ "$codigo" != 0 ] && [ "$dura" -lt 20 ] && [ "$modo" != "seguro" ] && [ -z "${RECOMP_GRAFICOS:-}" ]; then
+        echo "$(date '+%F %T') Cierre rápido con error: reintento en modo gráfico seguro" >>"$LOG"
+        lanzar seguro
+        codigo=$?
+        if [ "$codigo" = 0 ] || [ "$dura" -ge 20 ]; then
+            mkdir -p "$(dirname "$PREF")"
+            echo seguro >"$PREF"
+            echo "$(date '+%F %T') El modo seguro funcionó: se recuerda en $PREF" >>"$LOG"
+        fi
     fi
-fi
+    { [ "$codigo" = 0 ] || [ "$dura" -ge 20 ]; } && break
+    echo "$(date '+%F %T') $X86 no arranca RecompLauncher: pruebo el siguiente traductor" >>"$LOG"
+done
 if [ "$codigo" != 0 ] && [ "$dura" -lt 20 ]; then
     aviso "RecompLauncher se cerró al arrancar (código $codigo). Mira el registro: $LOG"
 fi
