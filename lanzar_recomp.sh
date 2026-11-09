@@ -86,6 +86,9 @@ if [ -d "$APPDIR/usr/lib" ]; then
         for l in libselinux.so.1 libmount.so.1 libblkid.so.1; do [ -e "$APPDIR/usr/lib/$l" ] && libs="$libs:$l"; done
         export BOX64_EMULATED_LIBS="$libs"
     fi
+    # WebKit pide sd_journal_send_with_location (libsystemd), que Box64 no tiene: una librería x86_64 vacía lo cubre.
+    STUB="$(dirname "$TIENDA")/herramientas/stubs/sdjournal_stub_x86_64.so"
+    [ -f "$STUB" ] && export BOX64_LD_PRELOAD="$STUB${BOX64_LD_PRELOAD:+:$BOX64_LD_PRELOAD}"
 fi
 cd "$HOME" || exit 1
 
