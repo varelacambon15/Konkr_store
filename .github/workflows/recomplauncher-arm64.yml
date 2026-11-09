@@ -18,6 +18,7 @@ permissions:
 
 env:
   TAG: ${{ github.event.inputs.tag || 'v0.90.0-beta.27' }}
+  REV: konkr2   # sube este sufijo cada vez que cambie el parche, para que el instalador baje el nuevo AppImage
 
 jobs:
   build:
@@ -42,6 +43,36 @@ jobs:
             libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev \
             libudev-dev libssl-dev patchelf file
 
+      - name: Parche Konkr - ofrecer también las builds x86_64 de cada juego
+        run: |
+          python3 - <<'PY'
+          # En Linux ARM64 el lanzador solo ofrecía builds ARM, y casi todas las recomps publican x86_64 (que en la Konkr
+          # se ejecutan con Box64/FEX). Solo cambia qué build de cada JUEGO se elige; la actualización del propio lanzador,
+          # Proton y el diagnóstico siguen usando la arquitectura real.
+          a = open("src-tauri/src/assets.rs").read()
+          marca = "/// `*` any run of characters, `?` one; letter case doesn't matter."
+          assert marca in a
+          a = a.replace(marca, """/// Konkr: processor to pick a game's build for. On Linux ARM64 the x86_64 builds run through Box64 or FEX.
+          pub fn build_arch_now() -> &'static str {
+              if cfg!(all(target_os = "linux", target_arch = "aarch64")) {
+                  "x64"
+              } else {
+                  arch_now()
+              }
+          }
+
+          """ + marca, 1)
+          open("src-tauri/src/assets.rs", "w").write(a)
+          l = open("src-tauri/src/lib.rs").read().split("\n")
+          n = 0
+          for i, t in enumerate(l):
+              if "assets::arch_now()" in t and not any(k in t for k in ("launcher_platform_entry", "CARGO_PKG_VERSION", '"arch"', "bundle_executable")):
+                  l[i] = t.replace("assets::arch_now()", "assets::build_arch_now()"); n += 1
+          assert n == 9, n
+          open("src-tauri/src/lib.rs", "w").write("\n".join(l))
+          print("parche aplicado:", n, "sitios")
+          PY
+
       - run: npm ci
 
       - name: Compilar el AppImage ARM64
@@ -60,8 +91,8 @@ jobs:
           mkdir -p out
           f="$(ls src-tauri/target/release/bundle/appimage/*.AppImage | head -1)"
           file "$f" | tee /dev/stderr | grep -qi "aarch64" || { echo "No es aarch64"; exit 1; }
-          n="$(basename "$f")"
-          case "$n" in *aarch64*|*arm64*) ;; *) n="${n%.AppImage}_aarch64.AppImage" ;; esac
+          n="$(basename "$f")"; n="${n%.AppImage}"; n="${n%_aarch64}"; n="${n%_arm64}"
+          n="${n}-${REV}_aarch64.AppImage"
           cp "$f" "out/$n"
           sha256sum "out/$n" | tee out/SHA256SUMS
           ls -l out
@@ -71,8 +102,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           rel="recomplauncher-arm64-$TAG"
+          # Solo hay una release ARM64 vigente: la anterior (compilada sin el parche) se retira.
+          gh release delete "$rel" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag 2>/dev/null || true
           gh release view "$rel" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
             gh release create "$rel" --repo "$GITHUB_REPOSITORY" --prerelease \
               --title "RecompLauncher $TAG (ARM64, nativo)" \
-              --notes "RecompLauncher $TAG compilado para ARM64 desde elripalda/RecompLauncher (GPL-3.0). Para la KONKR Pocket FIT: sin Box64 ni FEX."
+              --notes "RecompLauncher $TAG compilado para ARM64 desde elripalda/RecompLauncher (GPL-3.0), con un parche mínimo que ofrece también las builds x86_64 de cada juego. Para la KONKR Pocket FIT: el lanzador va nativo; los juegos x86_64 se ejecutan con Box64/FEX."
           gh release upload "$rel" out/* --clobber --repo "$GITHUB_REPOSITORY"
