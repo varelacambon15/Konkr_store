@@ -168,7 +168,9 @@ if [ "$codigo" != 0 ] && [ "$dura" -lt 20 ]; then
     {
         echo "== Box64 con trazas (variante 2), $(date '+%F %T')"
         echo "BOX64_LD_LIBRARY_PATH=${BOX64_LD_LIBRARY_PATH:-}"; echo "BOX64_EMULATED_LIBS=${BOX64_EMULATED_LIBS:-}"; echo "RT=${RT:-}"
-        BOX64_LOG=1 BOX64_DLSYM_ERROR=1 "${cands[0]}" "$APPDIR/usr/bin/recomplauncher" 2>&1 | grep -v JUMP_SLOT | tail -30 | cut -c1-220
+        BOX64_LOG=1 BOX64_DLSYM_ERROR=1 "${cands[0]}" "$APPDIR/usr/bin/recomplauncher" >"$LOGDIR/box64_completo.log" 2>&1
+        echo "-- líneas sobre dbus, systemd y sus dependencias, y todos los errores:"
+        grep -v JUMP_SLOT "$LOGDIR/box64_completo.log" | grep -n -i -E "dbus|systemd|libcap|gcrypt|gpg-error|lzma|lz4|zstd|Error|cannot|not found|undefined|failed" | cut -c1-240 | head -40
     } >"$DEP" 2>&1
     aviso_extra="Detalle técnico guardado en $DEP"
     echo "$aviso_extra" >>"$LOG"
