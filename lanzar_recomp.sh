@@ -80,7 +80,12 @@ export GDK_SCALE="${RECOMP_ESCALA:-1}"
 # sistema, más antigua, y RecompLauncher sale con 255. Se emulan las GLib que trae el AppImage. FEX ignora estas variables.
 if [ -d "$APPDIR/usr/lib" ]; then
     export BOX64_LD_LIBRARY_PATH="$APPDIR/usr/lib${BOX64_LD_LIBRARY_PATH:+:$BOX64_LD_LIBRARY_PATH}"
-    export BOX64_EMULATED_LIBS="${BOX64_EMULATED_LIBS:-libglib-2.0.so.0:libgobject-2.0.so.0:libgio-2.0.so.0:libgmodule-2.0.so.0}"
+    # libselinux/libmount: libgio las necesita y Box64 buscaría las nativas (que en SteamOS ARM no existen); se emulan las del AppImage.
+    if [ -z "${BOX64_EMULATED_LIBS:-}" ]; then
+        libs="libglib-2.0.so.0:libgobject-2.0.so.0:libgio-2.0.so.0:libgmodule-2.0.so.0"
+        for l in libselinux.so.1 libmount.so.1 libblkid.so.1; do [ -e "$APPDIR/usr/lib/$l" ] && libs="$libs:$l"; done
+        export BOX64_EMULATED_LIBS="$libs"
+    fi
 fi
 cd "$HOME" || exit 1
 
