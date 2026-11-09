@@ -87,20 +87,29 @@ if [ "$desde_steam" = 1 ] && [ -n "${DISPLAY:-}" ]; then
     export GDK_BACKEND=x11
 fi
 export GDK_SCALE="${RECOMP_ESCALA:-1}"
-# Box64: libsoup del AppImage necesita GLib reciente (g_uri_*, g_task_set_static_name...); sin esto usa la GLib envuelta del
-# sistema, más antigua, y RecompLauncher sale con 255. Se emulan las GLib que trae el AppImage. FEX ignora estas variables.
-if [ -d "$APPDIR/usr/lib" ]; then
-    export BOX64_LD_LIBRARY_PATH="$APPDIR/usr/lib${BOX64_LD_LIBRARY_PATH:+:$BOX64_LD_LIBRARY_PATH}"
-    # libselinux/libmount: libgio las necesita y Box64 buscaría las nativas (que en SteamOS ARM no existen); se emulan las del AppImage.
-    if [ -z "${BOX64_EMULATED_LIBS:-}" ]; then
-        libs="libglib-2.0.so.0:libgobject-2.0.so.0:libgio-2.0.so.0:libgmodule-2.0.so.0"
-        for l in libselinux.so.1 libmount.so.1 libblkid.so.1; do [ -e "$APPDIR/usr/lib/$l" ] && libs="$libs:$l"; done
-        export BOX64_EMULATED_LIBS="$libs"
-    fi
-    # WebKit pide sd_journal_send_with_location (libsystemd), que Box64 no tiene: una librería x86_64 vacía lo cubre.
-    STUB="$(dirname "$TIENDA")/herramientas/stubs/sdjournal_stub_x86_64.so"
-    [ -f "$STUB" ] && export BOX64_LD_PRELOAD="$STUB${BOX64_LD_PRELOAD:+:$BOX64_LD_PRELOAD}"
-fi
+# Box64: el AppImage trae sus GLib, libselinux, etc. y Box64 por defecto usaría las del sistema (más antiguas o ausentes en SteamOS ARM).
+# Se prueban varias combinaciones hasta que una arranque (variante 1, 2, 3); FEX ignora estas variables.
+STUB="$(dirname "$TIENDA")/herramientas/stubs/sdjournal_stub_x86_64.so"
+RT="$(ls -d /run/media/*/*/SteamLibrary/steamapps/common/SteamLinuxRuntime_4/steamrt4_platform_*/files/lib/x86_64-linux-gnu "$HOME"/.local/share/Steam/steamapps/common/SteamLinuxRuntime_4/steamrt4_platform_*/files/lib/x86_64-linux-gnu 2>/dev/null | head -1)"
+entorno_box64() {   # $1 = variante
+    unset BOX64_LD_LIBRARY_PATH BOX64_EMULATED_LIBS BOX64_LD_PRELOAD
+    [ -d "$APPDIR/usr/lib" ] || return 0
+    local libs="" l
+    case "$1" in
+        3) return 0 ;;   # Box64 sin ajustes
+        2) export BOX64_LD_LIBRARY_PATH="$APPDIR/usr/lib${RT:+:$RT}"
+           libs="libglib-2.0.so.0:libgobject-2.0.so.0:libgio-2.0.so.0:libgmodule-2.0.so.0"
+           for l in libselinux.so.1 libmount.so.1 libblkid.so.1 libdbus-1.so.3 libsystemd.so.0 libcap.so.2 libgcrypt.so.20 libgpg-error.so.0 liblzma.so.5 liblz4.so.1 libzstd.so.1; do
+               if [ -e "$APPDIR/usr/lib/$l" ] || { [ -n "$RT" ] && [ -e "$RT/$l" ]; }; then libs="$libs:$l"; fi
+           done ;;
+        *) export BOX64_LD_LIBRARY_PATH="$APPDIR/usr/lib"
+           libs="libglib-2.0.so.0:libgobject-2.0.so.0:libgio-2.0.so.0:libgmodule-2.0.so.0"
+           for l in libselinux.so.1 libmount.so.1 libblkid.so.1; do [ -e "$APPDIR/usr/lib/$l" ] && libs="$libs:$l"; done ;;
+    esac
+    export BOX64_EMULATED_LIBS="${libs}"
+    [ -f "$STUB" ] && export BOX64_LD_PRELOAD="$STUB"
+    return 0
+}
 cd "$HOME" || exit 1
 
 lanzar() {   # $1 = modo gráfico. Devuelve el código de salida; deja la duración en $dura.
@@ -124,7 +133,17 @@ lanzar() {   # $1 = modo gráfico. Devuelve el código de salida; deja la duraci
 }
 
 dura=0; codigo=1
-for X86 in "${cands[@]}"; do
+pares=()
+for c in "${cands[@]}"; do
+    case "$(basename "$c")" in
+        box64|directo) pares+=("$c|1" "$c|2" "$c|3") ;;
+        *) pares+=("$c|1") ;;
+    esac
+done
+for par in "${pares[@]}"; do
+    X86="${par%|*}"; variante="${par##*|}"
+    entorno_box64 "$variante"
+    echo "$(date '+%F %T') Variante $variante: BOX64_EMULATED_LIBS=${BOX64_EMULATED_LIBS:-}" >>"$LOG"
     dura=0
     lanzar "$modo"
     codigo=$?
@@ -140,7 +159,7 @@ for X86 in "${cands[@]}"; do
         fi
     fi
     { [ "$codigo" = 0 ] || [ "$dura" -ge 20 ]; } && break
-    echo "$(date '+%F %T') $X86 no arranca RecompLauncher: pruebo el siguiente traductor" >>"$LOG"
+    echo "$(date '+%F %T') $X86 (variante $variante) no arranca RecompLauncher: pruebo la siguiente" >>"$LOG"
 done
 if [ "$codigo" != 0 ] && [ "$dura" -lt 20 ]; then
     aviso "RecompLauncher se cerró al arrancar (código $codigo). Mira el registro: $LOG"
